@@ -57,7 +57,7 @@ class Engine:
             #for each collision
             for c in collisions:
                 #check if the depth is negative (if the objects are inside each other)
-                if c.depth < 0:
+                if c.depth > 0:
                     #if so, remove them along the axis of the normal
                     p.position += c.normal * c.depth
 
@@ -71,8 +71,10 @@ def findCollision(p: PointMass, points: list[PointMass]) -> list[Collision]:
     Collisions: list[Collision] = []
     for q in copy:
         delta: pg.Vector2 = p.position - q.position
+        print("pqdelta: " + str(delta))
         distance: float = delta.length()
+        print("pqdist: " + str(distance))
         normal: pg.Vector2 = delta/distance
-        depth: float = q.radius - distance
+        depth: float = p.radius + q.radius - distance
         Collisions.append(Collision(normal, depth))
     return Collisions
