@@ -25,12 +25,15 @@ class PointMass:
         return "Point" + str(self.id)
 
 class Collision:
-    def __init__(self, normal, depth):
+    def __init__(self, normal: pg.Vector2, depth: float, vel1: pg.Vector2, vel2: pg.Vector2):
         self.normal: pg.Vector2 = normal
         self.depth: float = depth
+        self.v2: pg.Vector2 = vel2
+        self.v1: pg.Vector2 = vel1
+        self.momentum: pg.Vector2 = vel1 + vel2
 
     def __str__(self):
-        return str(self.normal) + ", " + str(self.depth)
+        return str(self.normal) + ", " + str(self.depth) + ", " + str(self.v1) + ", " + str(self.v2)
 
 class Engine:
     
@@ -46,20 +49,17 @@ class Engine:
             print(str(p) + " @ " + str(p.position))
 
         print("collision step of update")
+        resolutions = []
         #check for collisions and resolve
         #for each point
         for p in self.points:
-            #create a list of collisions
-            collisions: list[Collision] = findCollision(p, self.points)
-
-            for collision in collisions:
-                print("collision: " + str(collision)) 
-            #for each collision
-            for c in collisions:
-                #check if the depth is negative (if the objects are inside each other)
-                if c.depth > 0:
-                    #if so, remove them along the axis of the normal
-                    p.position += c.normal * c.depth
+            resolutions.append(resolveCollisions(p, self.points))
+        
+        for rep in range(len(self.points)):
+            self.points[rep].position += resolutions[rep][0]
+            self.points[rep].velocity += resolutions[rep][1]
+        #once all resolutions are collected, apply them!
+            
 
 # creates Collisions for all sets of particles with respect to a particle p
 def findCollision(p: PointMass, points: list[PointMass]) -> list[Collision]:
@@ -71,10 +71,43 @@ def findCollision(p: PointMass, points: list[PointMass]) -> list[Collision]:
     Collisions: list[Collision] = []
     for q in copy:
         delta: pg.Vector2 = p.position - q.position
-        print("pqdelta: " + str(delta))
         distance: float = delta.length()
-        print("pqdist: " + str(distance))
         normal: pg.Vector2 = delta/distance
         depth: float = p.radius + q.radius - distance
-        Collisions.append(Collision(normal, depth))
+        Collisions.append(Collision(normal, depth, p.velocity, q.velocity))
     return Collisions
+
+def resolveCollisions(p: PointMass, points: list[PointMass]) -> tuple:
+    #create a prev variable to store the previous position so we can calculate change in velocity
+    prev = p.position
+    #create a list of collisions
+    collisions: list[Collision] = findCollision(p, points)
+
+    for collision in collisions:
+        print(str(p) + "collision: " + str(collision))
+
+    #if there are multiple collisions, we want to be able to sum the position and velocity effects
+    sumPos = pg.Vector2(0, 0)
+    sumVel = pg.Vector2(0, 0)
+
+    #for each collision
+    for c in collisions:
+        if c.depth >= 0: #check if the depth is positive (if the objects are inside each other)
+            if c.momentum.length() == 0: #if so and momentum will sum to nothing, remove them among the axis of the normal in half proportion
+                sumPos += c.normal * (c.depth / 2) 
+            else: #if so, and momentum is nonzero, remove them along the axis of the normal, proportional to p's proportion of momentum in the system
+                sumPos += c.normal * (c.depth * (p.velocity.length() / c.momentum.length()))
+
+            #next, update velocity after the collision
+            #momentum is preserved, so final momentum of the system is the combined momentum of the two colliders
+            #m1v1 + m2v2 = (m1+m2)vf, so vf = (v1+v2)/2
+            # vn = c.normal * c.momentum.length()
+            # vt = p.velocity - vn
+
+            sumVel += ((p.velocity + c.v2)/2)
+
+            # p.velocity = vn + vt
+            
+
+    #once we've gathered the sum of the effects of all collisions, bundle them and return it to the upper layer for eventual execution
+    return (sumPos, sumVel)
