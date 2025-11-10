@@ -40,6 +40,7 @@ class Engine:
     def __init__(self, points: list[PointMass]):
         self.points: list[PointMass] = points
 
+    #update method that we'll call to simulate one "tick" of physics
     def update(self, dt):
 
         print("position step of update")
@@ -64,7 +65,8 @@ class Engine:
 # creates Collisions for all sets of particles with respect to a particle p
 def findCollision(p: PointMass, points: list[PointMass]) -> list[Collision]:
     
-    #remove p from points to avoid considering consideration of self collision
+    #remove p from points to avoid considering consideration of self collision. 
+    #This works since structural changes aren't preserved in a shallow copy
     copy = points.copy()
     copy.remove(p)
 
@@ -95,8 +97,12 @@ def resolveCollisions(p: PointMass, points: list[PointMass]) -> tuple:
         if c.depth >= 0: #check if the depth is positive (if the objects are inside each other)
             if c.momentum.length() == 0: #if so and momentum will sum to nothing, remove them among the axis of the normal in half proportion
                 sumPos += c.normal * (c.depth * 0.5) 
-            else: #if so, and momentum is nonzero, remove them along the axis of the normal, proportional to p's proportion of momentum in the system
-                sumPos += c.normal * (c.depth * (p.velocity.dot(c.normal)/c.v2.dot(c.normal)) / c.depth)
+            elif c.depth != 0: #if so, and depth is nonzero, remove them along the axis of the normal, proportional to p's velocity in the direction of the normal
+                sumPos += c.normal * (c.depth * 0.5) 
+                #I'm gonna come back to this later because this meet in the middle part isn't fucking working no matter what I do. I hate it here
+                print("adding to " + str(p) + str(sumPos))
+            else:
+                sumPos = pg.Vector2(0, 0)
 
             #next, update velocity after the collision
             #momentum is preserved, so final momentum of the system is the combined momentum of the two colliders
