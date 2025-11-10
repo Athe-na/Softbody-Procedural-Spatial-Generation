@@ -94,20 +94,21 @@ def resolveCollisions(p: PointMass, points: list[PointMass]) -> tuple:
     for c in collisions:
         if c.depth >= 0: #check if the depth is positive (if the objects are inside each other)
             if c.momentum.length() == 0: #if so and momentum will sum to nothing, remove them among the axis of the normal in half proportion
-                sumPos += c.normal * (c.depth / 2) 
+                sumPos += c.normal * (c.depth * 0.5) 
             else: #if so, and momentum is nonzero, remove them along the axis of the normal, proportional to p's proportion of momentum in the system
-                sumPos += c.normal * (c.depth * (p.velocity.length() / c.momentum.length()))
+                sumPos += c.normal * (c.depth * (p.velocity.dot(c.normal)/c.v2.dot(c.normal)) / c.depth)
 
             #next, update velocity after the collision
             #momentum is preserved, so final momentum of the system is the combined momentum of the two colliders
-            #m1v1 + m2v2 = (m1+m2)vf, so vf = (v1+v2)/2
-            # vn = c.normal * c.momentum.length()
-            # vt = p.velocity - vn
-
-            sumVel += ((p.velocity + c.v2)/2)
-
-            # p.velocity = vn + vt
+            #velocity of point with respect to normal is vel dot normal for unit normal.
+            #velocity of collision with respect to normal is (vel1+vel2) / 2.
+            vn = c.normal * ((p.velocity.dot(c.normal) + c.v2.dot(c.normal)) / 2)
+            print(str(p) + "velocity with respect to normal: " + str(vn))
             
+            #thus, sumVel is the difference between the current velocity with respect to the normal and vn
+            sumVel = vn - p.velocity.project(c.normal)
 
+            print("Adding to " + str(p) + str(sumVel))
+            
     #once we've gathered the sum of the effects of all collisions, bundle them and return it to the upper layer for eventual execution
     return (sumPos, sumVel)

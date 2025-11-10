@@ -31,7 +31,7 @@ def main():
     
     #provide some initial points
     points: list[PointMass] = [PointMass(pg.Vector2(200, 100), pg.Vector2(10, 0), pg.Vector2(0, 0)),
-                               PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0))]
+                               PointMass(pg.Vector2(240, 95), pg.Vector2(-10, 5), pg.Vector2(0, 0))]
     # points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 20), pg.Vector2(0, 0)))
 
     #initialize the engine
@@ -42,6 +42,7 @@ def main():
 
     #Sim loop flag
     running = True
+    frame = 0
     #Run the sim loop
     while running:
         #Event handling
@@ -54,8 +55,10 @@ def main():
                     e.update(1)
                     window.fill((255, 255, 255))
                     drawEngine(e, window)
+                    print("Frame " + str(frame))
                     pg.display.update()
-                    print("updating frame")
+        frame += 1
+                    
         
 def drawEngine(e: Engine, window):
     for p in e.points:
