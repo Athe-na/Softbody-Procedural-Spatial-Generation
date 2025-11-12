@@ -30,19 +30,21 @@ def main():
     
     
     #provide some initial points
-    points: list[PointMass] = [PointMass(pg.Vector2(100, 100), pg.Vector2(10, 0), pg.Vector2(0, 0)),
-                               PointMass(pg.Vector2(200, 100), pg.Vector2(10, 0), pg.Vector2(0, 0))]
-    points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0)))
+    points: list[PointMass] = [PointMass(pg.Vector2(100, 100), pg.Vector2(20, 0), pg.Vector2(0, 0)),
+                               PointMass(pg.Vector2(200, 100), pg.Vector2(-20, 0), pg.Vector2(0, 0))]
+    #points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0)))
 
     #initialize the engine
-    e = Engine(points)
+    e = Engine(points, 0.5, 0.5)
     drawEngine(e, window)
 
     pg.display.update()
 
-    #Sim loop flag
+    #initialize sim clock and other guts of program
+    clock = pg.time.Clock()
     running = True
-    frame = 0
+    dt = 0
+
     #Run the sim loop
     while running:
         #Event handling
@@ -50,15 +52,29 @@ def main():
             if event.type == pg.QUIT:
                 running = False
             if event.type == pg.KEYDOWN:
-                if event.key == pg.K_SPACE:
-                    #if space is pressed, advance generation
-                    e.update(1)
-                    window.fill((255, 255, 255))
-                    drawEngine(e, window)
-                    print("Frame " + str(frame))
-                    pg.display.update()
-        frame += 1
-                    
+                if event.key == pg.K_SPACE: #if space is pressed, pause
+                    paused = True
+                    while paused:
+                        for event in pg.event.get():
+                            if event.type == pg.QUIT:
+                                paused = False
+                                running = False
+                            if event.type == pg.KEYDOWN:
+                                if event.key == pg.K_SPACE: # if space is pressed again, unpause
+                                    clock.tick(60)
+                                    paused = False
+                            if event.type == pg.K_SLASH: #if slash is pressed, step forward a frame
+                                e.update(dt)
+                                window.fill((255, 255, 255))
+                                drawEngine(e, window)
+                                pg.display.update()            
+                                dt = 60/1000 
+
+        e.update(dt)
+        window.fill((255, 255, 255))
+        drawEngine(e, window)
+        pg.display.update()            
+        dt = clock.tick(60)/1000                    
         
 def drawEngine(e: Engine, window):
     for p in e.points:

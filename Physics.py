@@ -14,15 +14,29 @@ class PointMass:
         self.id = self.IDCounter
         print("Created PointMass with id " + str(self.IDCounter))
         PointMass.IDCounter += 1
-
-    def checkEdgeCollision(self):
-        if self.position.x - self.radius < 0:
-            self.velocity.x = 0
-        if self.position.y - self.radius < 0:
-            self.velocity.y = 0
     
     def __str__(self):
         return "Point" + str(self.id)
+    
+class Wall:
+    IDCounter = 0
+
+    def __init__(self, pos0: pg.Vector2, pos1: pg.Vector2, radius: float):
+        #initialize wall
+        self.pos0 = pos0
+        self.pos1 = pos1
+        self.length = pos0.distance_to(pos1)
+        self.radius = radius
+
+        #slightly more complex properties that are nonetheless worthwhile to do here
+        self.center = pos0 + (pos1-pos0).normalize() * self.length/2
+
+        self.id = self.IDCounter
+        print("Created Wall with id " + str(self.IDCounter))
+        Wall.IDCounter += 1
+
+    def __str__(self):
+        return "Wall" + str(self.id)
 
 class Collision:
     def __init__(self, normal: pg.Vector2, depth: float, vel1: pg.Vector2, vel2: pg.Vector2):
@@ -37,8 +51,10 @@ class Collision:
 
 class Engine:
     
-    def __init__(self, points: list[PointMass]):
+    def __init__(self, points: list[PointMass], elasticity: float, friction: float):
         self.points: list[PointMass] = points
+        self.elasticity: float = elasticity
+        self.friction: float = friction
 
     #update method that we'll call to simulate one "tick" of physics
     def update(self, dt):
@@ -51,10 +67,10 @@ class Engine:
 
         print("collision step of update")
         resolutions = []
-        #check for collisions and resolve
+        #check for PointMass collisions and resolve
         #for each point
         for p in self.points:
-            resolutions.append(resolveCollisions(p, self.points))
+            resolutions.append(self.resolveCollisions(p, self.points))
         
         for rep in range(len(self.points)):
             self.points[rep].position += resolutions[rep][0]
@@ -62,59 +78,72 @@ class Engine:
         #once all resolutions are collected, apply them!
             
 
-# creates Collisions for all sets of particles with respect to a particle p
-def findCollision(p: PointMass, points: list[PointMass]) -> list[Collision]:
+    # creates Collisions for all sets of particles with respect to a particle p
+    def findCollision(self, p: PointMass, points: list[PointMass]) -> list[Collision]:
+        
+        #remove p from points to avoid considering consideration of self collision. 
+        #This works since structural changes aren't preserved in a shallow copy
+        copy = points.copy()
+        copy.remove(p)
+
+        Collisions: list[Collision] = []
+        for q in copy:
+            delta: pg.Vector2 = p.position - q.position
+            distance: float = delta.length()
+            normal: pg.Vector2 = delta/distance
+            depth: float = p.radius + q.radius - distance
+            Collisions.append(Collision(normal, depth, p.velocity, q.velocity))
+        return Collisions
+
+    def resolveCollisions(self, p: PointMass, points: list[PointMass]) -> tuple[pg.Vector2]:
+        #create a prev variable to store the previous position so we can calculate change in velocity
+        prev = p.position
+        #create a list of point collisions
+        collisions: list[Collision] = self.findCollision(p, points)
+
+        #create a list of wall collisions
+        
+
+        for collision in collisions:
+            print(str(p) + "collision: " + str(collision))
+
+        #if there are multiple collisions, we want to be able to sum the position and velocity effects
+        sumPos = pg.Vector2(0, 0)
+        sumVel = pg.Vector2(0, 0)
+
+        #for each collision
+        for c in collisions:
+            if c.depth > 0: #check if the depth is positive (if the objects are inside each other)
+                if c.momentum.length() == 0: #if so and momentum will sum to nothing, remove them among the axis of the normal in half proportion
+                    sumPos += c.normal * (c.depth * 0.5) 
+                elif c.depth != 0: #if so, and depth is nonzero, remove them along the axis of the normal, proportional to p's velocity in the direction of the normal
+                    sumPos += c.normal * (c.depth * 0.5) 
+                    #I'm gonna come back to this later because this meet in the middle part isn't fucking working no matter what I do. I hate it here
+                    print("adding to " + str(p) + str(sumPos))
+                else:
+                    sumPos = pg.Vector2(0, 0)
+
+                #compute relative velocity (and split it into tangential and normal)
+                relVelocity = p.velocity - c.v2
+                relVelocityN = relVelocity.project(c.normal)
+                relVelocityT = relVelocity - relVelocityN
+
+                #next, update velocity after the collision by computing forces on p
+                #elastic force (normal)
+                force: pg.Vector2 = relVelocityN * self.elasticity
+
+                #inelastic force (normal)
+                force += relVelocityN/2 * (1-self.elasticity)
+
+                #tangential force (friction)
+                force += relVelocityT/2 * self.friction
+
+                sumVel -= force
+
+                print("Adding to " + str(p) + str(sumVel))
+                
+        #once we've gathered the sum of the effects of all collisions, bundle them and return it to the upper layer for eventual execution
+        return (sumPos, sumVel)
     
-    #remove p from points to avoid considering consideration of self collision. 
-    #This works since structural changes aren't preserved in a shallow copy
-    copy = points.copy()
-    copy.remove(p)
-
-    Collisions: list[Collision] = []
-    for q in copy:
-        delta: pg.Vector2 = p.position - q.position
-        distance: float = delta.length()
-        normal: pg.Vector2 = delta/distance
-        depth: float = p.radius + q.radius - distance
-        Collisions.append(Collision(normal, depth, p.velocity, q.velocity))
-    return Collisions
-
-def resolveCollisions(p: PointMass, points: list[PointMass]) -> tuple:
-    #create a prev variable to store the previous position so we can calculate change in velocity
-    prev = p.position
-    #create a list of collisions
-    collisions: list[Collision] = findCollision(p, points)
-
-    for collision in collisions:
-        print(str(p) + "collision: " + str(collision))
-
-    #if there are multiple collisions, we want to be able to sum the position and velocity effects
-    sumPos = pg.Vector2(0, 0)
-    sumVel = pg.Vector2(0, 0)
-
-    #for each collision
-    for c in collisions:
-        if c.depth >= 0: #check if the depth is positive (if the objects are inside each other)
-            if c.momentum.length() == 0: #if so and momentum will sum to nothing, remove them among the axis of the normal in half proportion
-                sumPos += c.normal * (c.depth * 0.5) 
-            elif c.depth != 0: #if so, and depth is nonzero, remove them along the axis of the normal, proportional to p's velocity in the direction of the normal
-                sumPos += c.normal * (c.depth * 0.5) 
-                #I'm gonna come back to this later because this meet in the middle part isn't fucking working no matter what I do. I hate it here
-                print("adding to " + str(p) + str(sumPos))
-            else:
-                sumPos = pg.Vector2(0, 0)
-
-            #next, update velocity after the collision
-            #momentum is preserved, so final momentum of the system is the combined momentum of the two colliders
-            #velocity of point with respect to normal is vel dot normal for unit normal.
-            #velocity of collision with respect to normal is (vel1+vel2) / 2.
-            vn = c.normal * ((p.velocity.dot(c.normal) + c.v2.dot(c.normal)) / 2)
-            print(str(p) + "velocity with respect to normal: " + str(vn))
-            
-            #thus, sumVel is the difference between the current velocity with respect to the normal and vn
-            sumVel = vn - p.velocity.project(c.normal)
-
-            print("Adding to " + str(p) + str(sumVel))
-            
-    #once we've gathered the sum of the effects of all collisions, bundle them and return it to the upper layer for eventual execution
-    return (sumPos, sumVel)
+    def resolveWallCollisions(self, p: PointMass, walls: list[Wall]) -> tuple:
+        pass
