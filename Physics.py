@@ -51,10 +51,13 @@ class Collision:
 
 class Engine:
     
-    def __init__(self, points: list[PointMass], elasticity: float, friction: float):
+    def __init__(self, points: list[PointMass], walls: list[Wall], elasticity: float, friction: float, WIDTH: int, HEIGHT: int):
         self.points: list[PointMass] = points
+        self.walls: list[Wall] = walls
         self.elasticity: float = elasticity
         self.friction: float = friction
+        self.WIDTH: int = WIDTH
+        self.HEIGHT: int = HEIGHT
 
     #update method that we'll call to simulate one "tick" of physics
     def update(self, dt):
@@ -68,9 +71,9 @@ class Engine:
         print("collision step of update")
         resolutions = []
         #check for PointMass collisions and resolve
-        #for each point
+        
         for p in self.points:
-            resolutions.append(self.resolveCollisions(p, self.points))
+            resolutions.append(self.resolveCollisions(p, self.points, self.walls))
         
         for rep in range(len(self.points)):
             self.points[rep].position += resolutions[rep][0]
@@ -79,30 +82,70 @@ class Engine:
             
 
     # creates Collisions for all sets of particles with respect to a particle p
-    def findCollision(self, p: PointMass, points: list[PointMass]) -> list[Collision]:
-        
+    def findCollision(self, p: PointMass, points: list[PointMass], walls: list[Wall]) -> list[Collision]:   
+
         #remove p from points to avoid considering consideration of self collision. 
-        #This works since structural changes aren't preserved in a shallow copy
+        #This works since structural changes aren't back propogated in a shallow copy
         copy = points.copy()
         copy.remove(p)
 
         Collisions: list[Collision] = []
+
+        # Find bounding collisions
+        if (p.position.x + p.radius) > self.WIDTH:
+            normal: pg.Vector2 = pg.Vector2(-1, 0)
+            depth: float = (p.position.x + p.radius) - self.WIDTH
+            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0)))
+        if (p.position.x - p.radius) < 0:
+            normal: pg.Vector2 = pg.Vector2(1, 0)
+            depth: float = 0 - (p.position.x - p.radius)
+            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0)))
+        if (p.position.y + p.radius) > self.HEIGHT:
+            normal: pg.Vector2 = pg.Vector2(0, 1)
+            depth: float = (p.position.y + p.radius) - self.HEIGHT
+            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0)))
+        if (p.position.y - p.radius) < 0:
+            normal: pg.Vector2 = pg.Vector2(0, -1)
+            depth: float = 0 - (p.position.y - p.radius)
+            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0)))
+            
+        # Find PointMass collisions
         for q in copy:
             delta: pg.Vector2 = p.position - q.position
             distance: float = delta.length()
             normal: pg.Vector2 = delta/distance
             depth: float = p.radius + q.radius - distance
             Collisions.append(Collision(normal, depth, p.velocity, q.velocity))
+        
+    
+        # Find Wall collisions (NOT CURRENTLY IN USE)
+        for w in walls:
+            # Take delta from each endpoint
+            delta0: pg.Vector2 = p.position - w.pos0
+            delta1: pg.Vector2 = p.position - w.pos1
+
+            # Calculate Tangent to flat part of wall
+            flatTangent: pg.Vector2 = (w.pos0 - w.pos1).normalize()
+
+            # And use that to calculate the normal
+            flatNormal: pg.Vector2 = pg.Vector2(0, 0)
+            flatNormal.xy = flatTangent.yx
+            flatNormal.y *= -1
+
+            # Make sure the normal is oriented in the right direction by checking to see whether adding it takes us closer or farther from the wall
+            if (p.position + flatNormal).distance_to(w.center) < p.position.distance_to(w.center): # If not, reverse it
+                flatNormal *= -1
+            
+            # With all this, create distanceC
+            
+
         return Collisions
 
-    def resolveCollisions(self, p: PointMass, points: list[PointMass]) -> tuple[pg.Vector2]:
+    def resolveCollisions(self, p: PointMass, points: list[PointMass], walls: list[Wall]) -> tuple[pg.Vector2, pg.Vector2]:
         #create a prev variable to store the previous position so we can calculate change in velocity
         prev = p.position
         #create a list of point collisions
-        collisions: list[Collision] = self.findCollision(p, points)
-
-        #create a list of wall collisions
-        
+        collisions: list[Collision] = self.findCollision(p, points, walls)        
 
         for collision in collisions:
             print(str(p) + "collision: " + str(collision))
@@ -145,5 +188,6 @@ class Engine:
         #once we've gathered the sum of the effects of all collisions, bundle them and return it to the upper layer for eventual execution
         return (sumPos, sumVel)
     
-    def resolveWallCollisions(self, p: PointMass, walls: list[Wall]) -> tuple:
-        pass
+    def resolveWallCollisions(self, p: PointMass, walls: list[Wall]) -> tuple[pg.Vector2, pg.Vector2]:
+        pass 
+        return(pg.Vector2(0,0), pg.Vector2(0,0))

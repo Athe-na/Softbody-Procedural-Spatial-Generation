@@ -5,7 +5,7 @@ import io
 import sys
 import math
 from Dinosaur import Dinosaur
-from Physics import Engine, PointMass
+from Physics import Engine, PointMass, Wall
 
 def main():
 
@@ -34,8 +34,11 @@ def main():
                                PointMass(pg.Vector2(200, 100), pg.Vector2(-20, 0), pg.Vector2(0, 0))]
     #points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0)))
 
+    # Provide initial walls (NOT CURRENTLY IN USE)
+    walls: list[Wall] = [Wall(pg.Vector2(0,0), pg.Vector2(100,0), 5)]
+
     #initialize the engine
-    e = Engine(points, 0.5, 0.5)
+    e = Engine(points, walls, 0.5, 0.5, WIDTH, HEIGHT)
     drawEngine(e, window)
 
     pg.display.update()
