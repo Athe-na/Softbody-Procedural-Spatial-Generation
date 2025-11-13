@@ -39,15 +39,16 @@ class Wall:
         return "Wall" + str(self.id)
 
 class Collision:
-    def __init__(self, normal: pg.Vector2, depth: float, vel1: pg.Vector2, vel2: pg.Vector2):
+    def __init__(self, normal: pg.Vector2, depth: float, vel1: pg.Vector2, vel2: pg.Vector2, wall: bool):
         self.normal: pg.Vector2 = normal
         self.depth: float = depth
         self.v2: pg.Vector2 = vel2
         self.v1: pg.Vector2 = vel1
         self.momentum: pg.Vector2 = vel1 + vel2
+        self.wall: bool = wall
 
     def __str__(self):
-        return str(self.normal) + ", " + str(self.depth) + ", " + str(self.v1) + ", " + str(self.v2)
+        return str(self.normal) + ", " + str(self.depth) + ", " + str(self.v1) + ", " + str(self.v2) + ", " + str(self.wall)
 
 class Engine:
     
@@ -62,22 +63,21 @@ class Engine:
     #update method that we'll call to simulate one "tick" of physics
     def update(self, dt):
 
-        print("position step of update")
+        # Initialize a resolutions array
+        resolutions = []
+
         #update position as the current position plus the velocity x the change in time
         for p in self.points:
             p.position += p.velocity * dt
-            print(str(p) + " @ " + str(p.position))
 
-        print("collision step of update")
-        resolutions = []
         #check for PointMass collisions and resolve
-        
         for p in self.points:
             resolutions.append(self.resolveCollisions(p, self.points, self.walls))
         
         for rep in range(len(self.points)):
             self.points[rep].position += resolutions[rep][0]
             self.points[rep].velocity += resolutions[rep][1]
+            print("Resolved " + str(self.points[rep]) + " to " + str(self.points[rep].velocity) + "@" + str(self.points[rep].position))
         #once all resolutions are collected, apply them!
             
 
@@ -95,19 +95,19 @@ class Engine:
         if (p.position.x + p.radius) > self.WIDTH:
             normal: pg.Vector2 = pg.Vector2(-1, 0)
             depth: float = (p.position.x + p.radius) - self.WIDTH
-            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0)))
+            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0), True))
         if (p.position.x - p.radius) < 0:
             normal: pg.Vector2 = pg.Vector2(1, 0)
             depth: float = 0 - (p.position.x - p.radius)
-            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0)))
+            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0), True))
         if (p.position.y + p.radius) > self.HEIGHT:
-            normal: pg.Vector2 = pg.Vector2(0, 1)
-            depth: float = (p.position.y + p.radius) - self.HEIGHT
-            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0)))
-        if (p.position.y - p.radius) < 0:
             normal: pg.Vector2 = pg.Vector2(0, -1)
+            depth: float = (p.position.y + p.radius) - self.HEIGHT
+            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0), True))
+        if (p.position.y - p.radius) < 0:
+            normal: pg.Vector2 = pg.Vector2(0, 1)
             depth: float = 0 - (p.position.y - p.radius)
-            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0)))
+            Collisions.append(Collision(normal, depth, p.velocity, pg.Vector2(0, 0), True))
             
         # Find PointMass collisions
         for q in copy:
@@ -115,7 +115,7 @@ class Engine:
             distance: float = delta.length()
             normal: pg.Vector2 = delta/distance
             depth: float = p.radius + q.radius - distance
-            Collisions.append(Collision(normal, depth, p.velocity, q.velocity))
+            Collisions.append(Collision(normal, depth, p.velocity, q.velocity, False))
         
     
         # Find Wall collisions (NOT CURRENTLY IN USE)
@@ -145,10 +145,7 @@ class Engine:
         #create a prev variable to store the previous position so we can calculate change in velocity
         prev = p.position
         #create a list of point collisions
-        collisions: list[Collision] = self.findCollision(p, points, walls)        
-
-        for collision in collisions:
-            print(str(p) + "collision: " + str(collision))
+        collisions: list[Collision] = self.findCollision(p, points, walls)
 
         #if there are multiple collisions, we want to be able to sum the position and velocity effects
         sumPos = pg.Vector2(0, 0)
@@ -157,14 +154,15 @@ class Engine:
         #for each collision
         for c in collisions:
             if c.depth > 0: #check if the depth is positive (if the objects are inside each other)
-                if c.momentum.length() == 0: #if so and momentum will sum to nothing, remove them among the axis of the normal in half proportion
-                    sumPos += c.normal * (c.depth * 0.5) 
-                elif c.depth != 0: #if so, and depth is nonzero, remove them along the axis of the normal, proportional to p's velocity in the direction of the normal
-                    sumPos += c.normal * (c.depth * 0.5) 
-                    #I'm gonna come back to this later because this meet in the middle part isn't fucking working no matter what I do. I hate it here
-                    print("adding to " + str(p) + str(sumPos))
+                # Debug: print out collision details
+                print(str(p) + "collision: " + str(c))
+                if c.v2 == pg.Vector2(0, 0): # If the other object isn't moving, remove along the normal but completely.
+                    sumPos += c.normal * c.depth
+                    print(str(p) + " in static collision " + str(c) + ", removed @" + str(sumPos))
                 else:
-                    sumPos = pg.Vector2(0, 0)
+                    # Calculate the proportion of the momentum that p has relative to the normal, and remove it by that amount
+                    proportion: float = p.velocity.project(c.normal).length() / (p.velocity.project(c.normal).length() + c.v2.project(c.normal).length())
+                    sumPos += c.normal * c.depth * proportion
 
                 #compute relative velocity (and split it into tangential and normal)
                 relVelocity = p.velocity - c.v2
@@ -180,6 +178,10 @@ class Engine:
 
                 #tangential force (friction)
                 force += relVelocityT/2 * self.friction
+
+                # If the collision is with a wall, the wall will not move, and the energy is returned to the PointMass proportional to friction
+                if c.wall:
+                    force += relVelocityN * self.elasticity
 
                 sumVel -= force
 

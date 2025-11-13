@@ -30,8 +30,8 @@ def main():
     
     
     #provide some initial points
-    points: list[PointMass] = [PointMass(pg.Vector2(100, 100), pg.Vector2(20, 0), pg.Vector2(0, 0)),
-                               PointMass(pg.Vector2(200, 100), pg.Vector2(-20, 0), pg.Vector2(0, 0))]
+    points: list[PointMass] = [PointMass(pg.Vector2(100, 100), pg.Vector2(100, 58), pg.Vector2(0, 0)),
+                               PointMass(pg.Vector2(200, 100), pg.Vector2(-240, 108), pg.Vector2(0, 0))]
     #points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0)))
 
     # Provide initial walls (NOT CURRENTLY IN USE)
@@ -71,7 +71,7 @@ def main():
                                 window.fill((255, 255, 255))
                                 drawEngine(e, window)
                                 pg.display.update()            
-                                dt = 60/1000 
+                                dt = 60/1000
 
         e.update(dt)
         window.fill((255, 255, 255))
