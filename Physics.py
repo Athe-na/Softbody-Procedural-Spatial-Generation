@@ -50,6 +50,17 @@ class Collision:
     def __str__(self):
         return str(self.normal) + ", " + str(self.depth) + ", " + str(self.v1) + ", " + str(self.v2) + ", " + str(self.wall)
 
+class Constraint:
+    
+    def __init__(self, index0: int, index1: int, distance: float, hard: bool):
+        self.index0 = index0
+        self.index1 = index1
+        self.distance = distance
+        self.hard = hard # If it's a hard constraint, the two points must be *within* the specified distance of each other.
+
+    def __str__(self):
+        return "point" + str(self.index0) + "!point" + str(self.index1) + " < " + str(self.distance) + ":" + str(self.hard)
+    
 class Engine:
     
     def __init__(self, points: list[PointMass], walls: list[Wall], elasticity: float, friction: float, WIDTH: int, HEIGHT: int):
@@ -59,6 +70,7 @@ class Engine:
         self.friction: float = friction
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
+        self.constraints: list[Constraint]
 
     #update method that we'll call to simulate one "tick" of physics
     def update(self, dt):
@@ -70,16 +82,58 @@ class Engine:
         for p in self.points:
             p.position += p.velocity * dt
 
-        #check for PointMass collisions and resolve
+        # Check for the various types of forces and other things we need to apply to each point
         for p in self.points:
+
+            # Check for point2point and bounding collisions and append to resolution list
             resolutions.append(self.resolveCollisions(p, self.points, self.walls))
-        
+            
+        for c in self.constraints: # For each constraint, identify the points involved and update their resolution based on the constraint
+            if c.hard: # If the constraint is hard, all we need to do is make sure the point doesn't exceed the distance value
+                
+                # Grab position values for the two involved points
+                p0 = self.points[c.index0].position
+                p1 = self.points[c.index1].position
+
+                # Find the delta and distance
+                delta = p1 - p0 # This points from p0 to p1
+                distance = delta.magnitude()
+
+                if distance > c.distance: # If the distance between the two points is greater than the constraint distance, make that not be the case :sob:
+                    # It's slightly more complicated, but can be thought about the same as resolving a direct collision:
+
+                    depth = distance - c.distance
+
+                    # Initialize sumPos and force for 0 and 1
+                    sumPos0: pg.Vector2 = pg.Vector2(0,0)
+                    sumPos1: pg.Vector2 = pg.Vector2(0,0)
+                    force0: pg.Vector2 = pg.Vector2(0,0)
+                    force1: pg.Vector2 = pg.Vector2(0,0)
+
+                    # Find the normal between the two points
+                    normal: pg.Vector2 = delta/distance
+                    # p0 should be pushed in the direction of the normal, p1 against
+                    # Grab velocities
+                    v0 = self.points[c.index0].velocity
+                    v1 = self.points[c.index1].velocity
+
+                    # Find relative velocity and split into components
+                    relVelocity = v1 - v0
+                    relVelocityN = relVelocity.project(normal)
+                    relVelocityT = relVelocity - relVelocityN
+
+                    if v0 == pg.Vector2(0,0): # If point 0 isn't moving, remove 1 along the normal completely
+                        sumPos1 += normal * (-depth)
+                    if v1 == pg.Vector2(0,0): # And opposite case.
+                        sumPos0 += normal * depth
+
+
         for rep in range(len(self.points)):
             self.points[rep].position += resolutions[rep][0]
             self.points[rep].velocity += resolutions[rep][1]
             print("Resolved " + str(self.points[rep]) + " to " + str(self.points[rep].velocity) + "@" + str(self.points[rep].position))
         #once all resolutions are collected, apply them!
-            
+
 
     # creates Collisions for all sets of particles with respect to a particle p
     def findCollision(self, p: PointMass, points: list[PointMass], walls: list[Wall]) -> list[Collision]:   
@@ -164,6 +218,7 @@ class Engine:
                     proportion: float = p.velocity.project(c.normal).length() / (p.velocity.project(c.normal).length() + c.v2.project(c.normal).length())
                     sumPos += c.normal * c.depth * proportion
 
+                # CREDIT TO: Iksha Phipps for assistance with this math
                 #compute relative velocity (and split it into tangential and normal)
                 relVelocity = p.velocity - c.v2
                 relVelocityN = relVelocity.project(c.normal)
