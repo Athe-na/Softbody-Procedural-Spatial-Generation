@@ -30,5 +30,6 @@ def main():
                         ("GYM", "LAUNDRY"), ("GYM", "UTILITY"),
                         ("LAUNDRY", "UTILITY")])
 # High level idea, places where edges cross are where hallways are placed, no edge cross indicates direct connection
-# Alternatively, place hallways where rooms touch that aren't meant to be adjacent? (sometimes)
+# Alternatively, place hallways where rooms touch that aren't meant to be adjacent? (sometimes) (PENISES)
 # When we place down room x from room y, see if room z connected to y is in x's acceptable adjacent rooms, if so, connect them.
+# Pre place bathrooms in generation graph, initialize connections from rooms being built in breadth first when rolled?

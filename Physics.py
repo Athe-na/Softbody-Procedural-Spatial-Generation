@@ -10,7 +10,7 @@ class PointMass:
     def __init__(self, position: pg.Vector2, velocity: pg.Vector2, acceleration: pg.Vector2):
         self.position: pg.Vector2 = position
         self.velocity: pg.Vector2 = velocity
-        self.acceleration: pg.Vector2 = acceleration
+        self.acceleration: pg.Vector2 = acceleration # Not currently using
         self.id = self.IDCounter
         print("Created PointMass with id " + str(self.IDCounter))
         PointMass.IDCounter += 1
@@ -52,7 +52,7 @@ class Collision:
 
 class Constraint:
     
-    def __init__(self, index0: int, index1: int, distance: float, hard: bool):
+    def __init__(self, index0: int, index1: int, distance: float, hard:bool =False):
         self.index0 = index0
         self.index1 = index1
         self.distance = distance
@@ -63,9 +63,10 @@ class Constraint:
     
 class Engine:
     
-    def __init__(self, points: list[PointMass], walls: list[Wall], elasticity: float, friction: float, WIDTH: int, HEIGHT: int):
+    def __init__(self, points: list[PointMass], walls: list[Wall], constraints: list[Constraint], elasticity: float, friction: float, WIDTH: int, HEIGHT: int):
         self.points: list[PointMass] = points
         self.walls: list[Wall] = walls
+        self.constraints: list[Constraint] = constraints
         self.elasticity: float = elasticity
         self.friction: float = friction
         self.WIDTH: int = WIDTH
@@ -76,7 +77,7 @@ class Engine:
     def update(self, dt):
 
         # Initialize a resolutions array
-        resolutions = []
+        resolutions: list[list[pg.Vector2]] = []
 
         #update position as the current position plus the velocity x the change in time
         for p in self.points:
@@ -122,10 +123,21 @@ class Engine:
                     relVelocityN = relVelocity.project(normal)
                     relVelocityT = relVelocity - relVelocityN
 
+                    
+
                     if v0 == pg.Vector2(0,0): # If point 0 isn't moving, remove 1 along the normal completely
                         sumPos1 += normal * (-depth)
-                    if v1 == pg.Vector2(0,0): # And opposite case.
+                    elif v1 == pg.Vector2(0,0): # And opposite case.
                         sumPos0 += normal * depth
+                    else:
+                        force: pg.Vector2 = relVelocityN * self.elasticity
+                    
+
+                    # Add the calculated sumPos and forces to the resolutions array for the appropriate point
+                    resolutions[c.index0][0] += sumPos0
+                    resolutions[c.index1][0] += sumPos1
+                    resolutions[c.index0][1] -= force0
+                    resolutions[c.index1][1] -= force1
 
 
         for rep in range(len(self.points)):
@@ -195,7 +207,7 @@ class Engine:
 
         return Collisions
 
-    def resolveCollisions(self, p: PointMass, points: list[PointMass], walls: list[Wall]) -> tuple[pg.Vector2, pg.Vector2]:
+    def resolveCollisions(self, p: PointMass, points: list[PointMass], walls: list[Wall]) -> list[pg.Vector2]:
         #create a prev variable to store the previous position so we can calculate change in velocity
         prev = p.position
         #create a list of point collisions
@@ -243,7 +255,7 @@ class Engine:
                 print("Adding to " + str(p) + str(sumVel))
                 
         #once we've gathered the sum of the effects of all collisions, bundle them and return it to the upper layer for eventual execution
-        return (sumPos, sumVel)
+        return [sumPos, sumVel]
     
     def resolveWallCollisions(self, p: PointMass, walls: list[Wall]) -> tuple[pg.Vector2, pg.Vector2]:
         pass 

@@ -5,7 +5,7 @@ import io
 import sys
 import math
 from Dinosaur import Dinosaur
-from Physics import Engine, PointMass, Wall
+from Physics import Engine, PointMass, Wall, Constraint
 
 def main():
 
@@ -30,15 +30,17 @@ def main():
     
     
     #provide some initial points
-    points: list[PointMass] = [PointMass(pg.Vector2(100, 100), pg.Vector2(100, 58), pg.Vector2(0, 0)),
-                               PointMass(pg.Vector2(200, 100), pg.Vector2(-240, 108), pg.Vector2(0, 0))]
+    points: list[PointMass] = [PointMass(pg.Vector2(100, 100), pg.Vector2(-100, 0), pg.Vector2(0, 0)),
+                               PointMass(pg.Vector2(180, 100), pg.Vector2(0, 0), pg.Vector2(0, 0))]
     #points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0)))
+
+    constraints: list[Constraint] = [Constraint(0, 1, 100, True)]
 
     # Provide initial walls (NOT CURRENTLY IN USE)
     walls: list[Wall] = [Wall(pg.Vector2(0,0), pg.Vector2(100,0), 5)]
 
     #initialize the engine
-    e = Engine(points, walls, 0.5, 0.5, WIDTH, HEIGHT)
+    e = Engine(points, walls, constraints, 0.5, 0.5, WIDTH, HEIGHT)
     drawEngine(e, window)
 
     pg.display.update()
@@ -80,9 +82,23 @@ def main():
         dt = clock.tick(60)/1000                    
         
 def drawEngine(e: Engine, window):
+    for c in e.constraints:
+        # Get points so we can grab their position and also calculate the distance between them
+        point0: PointMass = e.points[c.index0]
+        point1: PointMass = e.points[c.index1]
+        deltaLength = (point0.position - point1.position).length()
+        # Use the distance to scale the color of the constraint from 0 to 1: 
+        # 0 is as close together as possible (GREEN) (not possible because they'd be inside each other)
+        # 1 is as far apart as possible (RED)
+        colorScale = deltaLength/c.distance
+        print(colorScale)
+        # Draw a line from point0 to point1, colored according to how close they are to violating the constraint
+        pg.draw.line(window, (int(255*colorScale), int(255*(1-colorScale)), 0), point0.position, point1.position)
+
     for p in e.points:
         print(str(p) + " @ " + str(p.position))
         pg.draw.circle(window, (0, 0, 0), p.position, p.radius, 2)
+    
 
 def advanceFrame(Dinosaurs):
     for A in range(Dinosaurs.size).__reversed__():
