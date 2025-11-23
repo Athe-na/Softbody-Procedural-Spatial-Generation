@@ -17,7 +17,7 @@ def main():
                         "GYM", "STAIRS", "LAUNDRY", "UTILITY"])
     Adj.add_edges_from([("FOYER", "DINING"), ("FOYER", "LIVING"), ("FOYER", "KITCHEN"), ("FOYER", "STAIRS"), ("FOYER", "GARAGE"),
                         ("DINING", "LIVING"), ("DINING", "KITCHEN"), ("DINING", "FAMILY"), ("DINING", "HALFBATH"),
-                        ("LIVING", "STAIRS"), ("LIVING", "OFFICE"), ("LIVING", "HALFBATH"), ("LIVING", "GAME"), ("LIVING", "STAIRS"),
+                        ("LIVING", "STAIRS"), ("LIVING", "OFFICE"), ("LIVING", "HALFBATH"), ("LIVING", "GAME"),
                         ("FULLBATH", "MASTERBED"), ("FULLBATH", "BEDROOM"), ("FULLBATH", "GUESTBED"),
                         ("HALFBATH", "BEDROOM"), ("HALFBATH", "GUESTBED"), ("HALFBATH", "GYM"), ("HALFBATH", "LAUNDRY"),
                         ("MASTERBED", "OFFICE"), ("MASTERBED", "GYM"),    

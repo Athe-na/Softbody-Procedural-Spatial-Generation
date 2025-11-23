@@ -52,11 +52,12 @@ class Collision:
 
 class Constraint:
     
-    def __init__(self, index0: int, index1: int, distance: float, hard:bool =False):
+    def __init__(self, index0: int, index1: int, distance: float, hard:bool =False, springConst: float=1):
         self.index0 = index0
         self.index1 = index1
         self.distance = distance
         self.hard = hard # If it's a hard constraint, the two points must be *within* the specified distance of each other.
+        self.springConst = springConst
 
     def __str__(self):
         return "point" + str(self.index0) + "!point" + str(self.index1) + " < " + str(self.distance) + ":" + str(self.hard)
@@ -90,15 +91,16 @@ class Engine:
             resolutions.append(self.resolveCollisions(p, self.points, self.walls))
             
         for c in self.constraints: # For each constraint, identify the points involved and update their resolution based on the constraint
-            if c.hard: # If the constraint is hard, all we need to do is make sure the point doesn't exceed the distance value
-                
-                # Grab position values for the two involved points
-                p0 = self.points[c.index0].position
-                p1 = self.points[c.index1].position
+            
+            # Grab position values for the two involved points
+            p0 = self.points[c.index0].position
+            p1 = self.points[c.index1].position
 
-                # Find the delta and distance
-                delta = p1 - p0 # This points from p0 to p1
-                distance = delta.magnitude()
+            # Find the delta and distance
+            delta: pg.Vector2 = p1 - p0 # This points from p0 to p1
+            distance: float = delta.magnitude()
+            
+            if c.hard: # If the constraint is hard, all we need to do is make sure the point doesn't exceed the distance value
 
                 if distance > c.distance: # If the distance between the two points is greater than the constraint distance, make that not be the case :sob:
                     # It's slightly more complicated, but can be thought about the same as resolving a direct collision:
@@ -123,14 +125,26 @@ class Engine:
                     relVelocityN = relVelocity.project(normal)
                     relVelocityT = relVelocity - relVelocityN
 
-                    
+                    #next, update velocity after the collision by computing forces on both points
+                    #elastic force (normal)
+                    force0 = relVelocityN * -self.elasticity
+                    force1 = relVelocityN * self.elasticity
+
+                    #inelastic force (normal)
+                    force0 += relVelocityN/2 * -(1-self.elasticity)
+                    force1 += relVelocityN/2 * (1-self.elasticity)
+
+                    #tangential force (friction)
+                    force0 += relVelocityT/2 * -self.friction
+                    force1 += relVelocityT/2 * self.friction
 
                     if v0 == pg.Vector2(0,0): # If point 0 isn't moving, remove 1 along the normal completely
                         sumPos1 += normal * (-depth)
                     elif v1 == pg.Vector2(0,0): # And opposite case.
                         sumPos0 += normal * depth
-                    else:
-                        force: pg.Vector2 = relVelocityN * self.elasticity
+                    else: # Otherwise, remove them equally along the normal
+                        sumPos0 += normal * depth/2
+                        sumPos1 += normal * -(depth/2)
                     
 
                     # Add the calculated sumPos and forces to the resolutions array for the appropriate point
@@ -139,11 +153,26 @@ class Engine:
                     resolutions[c.index0][1] -= force0
                     resolutions[c.index1][1] -= force1
 
+            else: # If the constraint isn't hard, then apply dampened force towards the desired distance according to the spring constant
+                
+                normal: pg.Vector2 = delta / distance # Find the normal
+                targetDelta: pg.Vector2 = normal * c.distance # Find the desired position along that normal
+                force: pg.Vector2 = (targetDelta - delta) * c.springConst # Find undampened force based on desired minus actual times constant
+
+                v0: pg.Vector2 = self.points[c.index0].velocity
+                v1: pg.Vector2 = self.points[c.index1].velocity
+
+                sumVel0: pg.Vector2 = force * -dt
+                sumVel1: pg.Vector2 = force * dt
+
+                
+
+
 
         for rep in range(len(self.points)):
             self.points[rep].position += resolutions[rep][0]
             self.points[rep].velocity += resolutions[rep][1]
-            print("Resolved " + str(self.points[rep]) + " to " + str(self.points[rep].velocity) + "@" + str(self.points[rep].position))
+            print("Resolved " + str(self.points[rep]) + " to " + str(self.points[rep].velocity) + "(" + str(round(self.points[rep].velocity.magnitude(), 2)) + ")@" + str(self.points[rep].position))
         #once all resolutions are collected, apply them!
 
 

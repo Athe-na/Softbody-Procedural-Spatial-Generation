@@ -30,17 +30,19 @@ def main():
     
     
     #provide some initial points
-    points: list[PointMass] = [PointMass(pg.Vector2(100, 100), pg.Vector2(-100, 0), pg.Vector2(0, 0)),
-                               PointMass(pg.Vector2(180, 100), pg.Vector2(0, 0), pg.Vector2(0, 0))]
+    points: list[PointMass] = [PointMass(pg.Vector2(200, 100), pg.Vector2(-100, -12), pg.Vector2(0, 0)),
+                               PointMass(pg.Vector2(250, 100), pg.Vector2(0, 0), pg.Vector2(0, 0)),
+                               PointMass(pg.Vector2(175, 175), pg.Vector2(40, -140), pg.Vector2(0, 0))]
     #points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0)))
 
-    constraints: list[Constraint] = [Constraint(0, 1, 100, True)]
+    constraints: list[Constraint] = [Constraint(0, 1, 200, True),
+                                     Constraint(1, 2, 240, True)]
 
     # Provide initial walls (NOT CURRENTLY IN USE)
     walls: list[Wall] = [Wall(pg.Vector2(0,0), pg.Vector2(100,0), 5)]
 
     #initialize the engine
-    e = Engine(points, walls, constraints, 0.5, 0.5, WIDTH, HEIGHT)
+    e = Engine(points, walls, constraints, 0.9, 0.5, WIDTH, HEIGHT)
     drawEngine(e, window)
 
     pg.display.update()
@@ -68,12 +70,13 @@ def main():
                                 if event.key == pg.K_SPACE: # if space is pressed again, unpause
                                     clock.tick(60)
                                     paused = False
-                            if event.type == pg.K_SLASH: #if slash is pressed, step forward a frame
-                                e.update(dt)
-                                window.fill((255, 255, 255))
-                                drawEngine(e, window)
-                                pg.display.update()            
-                                dt = 60/1000
+                                if event.key == pg.K_s: #if s is pressed, step forward a frame
+                                    print("Stepping forward")
+                                    e.update(dt)
+                                    window.fill((255, 255, 255))
+                                    drawEngine(e, window)
+                                    pg.display.update()            
+                                    dt = 60/1000
 
         e.update(dt)
         window.fill((255, 255, 255))
