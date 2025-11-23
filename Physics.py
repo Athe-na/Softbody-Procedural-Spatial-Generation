@@ -64,12 +64,13 @@ class Constraint:
     
 class Engine:
     
-    def __init__(self, points: list[PointMass], walls: list[Wall], constraints: list[Constraint], elasticity: float, friction: float, WIDTH: int, HEIGHT: int):
+    def __init__(self, points: list[PointMass], walls: list[Wall], constraints: list[Constraint], elasticity: float, friction: float, springDamping: float, WIDTH: int, HEIGHT: int):
         self.points: list[PointMass] = points
         self.walls: list[Wall] = walls
         self.constraints: list[Constraint] = constraints
         self.elasticity: float = elasticity
         self.friction: float = friction
+        self.springDamping: float = springDamping
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
         self.constraints: list[Constraint]
@@ -152,22 +153,34 @@ class Engine:
                     resolutions[c.index1][0] += sumPos1
                     resolutions[c.index0][1] -= force0
                     resolutions[c.index1][1] -= force1
-
             else: # If the constraint isn't hard, then apply dampened force towards the desired distance according to the spring constant
                 
                 normal: pg.Vector2 = delta / distance # Find the normal
                 targetDelta: pg.Vector2 = normal * c.distance # Find the desired position along that normal
                 force: pg.Vector2 = (targetDelta - delta) * c.springConst # Find undampened force based on desired minus actual times constant
 
+                # Grab velocities for calculations
                 v0: pg.Vector2 = self.points[c.index0].velocity
                 v1: pg.Vector2 = self.points[c.index1].velocity
 
+                # Initialize sumVel vectors for both points.
                 sumVel0: pg.Vector2 = force * -dt
                 sumVel1: pg.Vector2 = force * dt
 
-                
+                # Grab relative velocity and damping factor
+                relVelocityN: pg.Vector2 = ((v1 + sumVel1) - (v0 + sumVel0)).project(normal)
+                dampingFactor: float = math.exp(-self.springDamping * dt)
 
+                # Find the new relative velocity according to the damping factor and the difference between current and desired
+                newRelVelocityN: pg.Vector2 = relVelocityN * dampingFactor
+                relVelocityDelta: pg.Vector2 = newRelVelocityN - relVelocityN
 
+                # Then apply that difference to each point.
+                sumVel0 -= relVelocityDelta
+                sumVel1 += relVelocityDelta
+
+                resolutions[c.index0][1] += sumVel0
+                resolutions[c.index1][1] += sumVel1
 
         for rep in range(len(self.points)):
             self.points[rep].position += resolutions[rep][0]

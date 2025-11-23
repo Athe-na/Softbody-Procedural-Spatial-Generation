@@ -30,19 +30,21 @@ def main():
     
     
     #provide some initial points
-    points: list[PointMass] = [PointMass(pg.Vector2(200, 100), pg.Vector2(-100, -12), pg.Vector2(0, 0)),
+    points: list[PointMass] = [PointMass(pg.Vector2(200, 100), pg.Vector2(0, 0), pg.Vector2(0, 0)),
                                PointMass(pg.Vector2(250, 100), pg.Vector2(0, 0), pg.Vector2(0, 0)),
-                               PointMass(pg.Vector2(175, 175), pg.Vector2(40, -140), pg.Vector2(0, 0))]
+    #                           PointMass(pg.Vector2(175, 175), pg.Vector2(40, -140), pg.Vector2(0, 0))
+                                ]
     #points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0)))
 
-    constraints: list[Constraint] = [Constraint(0, 1, 200, True),
-                                     Constraint(1, 2, 240, True)]
+    constraints: list[Constraint] = [Constraint(0, 1, 100, False, springConst=5),
+    #                                 Constraint(1, 2, 240, True)
+                                    ]
 
     # Provide initial walls (NOT CURRENTLY IN USE)
     walls: list[Wall] = [Wall(pg.Vector2(0,0), pg.Vector2(100,0), 5)]
 
     #initialize the engine
-    e = Engine(points, walls, constraints, 0.9, 0.5, WIDTH, HEIGHT)
+    e = Engine(points, walls, constraints, 0.75, 0.5, 2, WIDTH, HEIGHT)
     drawEngine(e, window)
 
     pg.display.update()
@@ -89,14 +91,25 @@ def drawEngine(e: Engine, window):
         # Get points so we can grab their position and also calculate the distance between them
         point0: PointMass = e.points[c.index0]
         point1: PointMass = e.points[c.index1]
-        deltaLength = (point0.position - point1.position).length()
-        # Use the distance to scale the color of the constraint from 0 to 1: 
-        # 0 is as close together as possible (GREEN) (not possible because they'd be inside each other)
-        # 1 is as far apart as possible (RED)
-        colorScale = deltaLength/c.distance
-        print(colorScale)
-        # Draw a line from point0 to point1, colored according to how close they are to violating the constraint
-        pg.draw.line(window, (int(255*colorScale), int(255*(1-colorScale)), 0), point0.position, point1.position)
+
+        if c.hard: # The coloring procedure we want to use for hard constraints
+            deltaLength = (point0.position - point1.position).length()
+            # Use the distance to scale the color of the constraint from 0 to 1: 
+            # 0 is as close together as possible (GREEN) (not possible because they'd be inside each other)
+            # 1 is as far apart as possible (RED)
+            colorScale = deltaLength/c.distance
+            print(colorScale)
+            # Draw a line from point0 to point1, colored according to how close they are to violating the constraint
+            pg.draw.line(window, (int(255*colorScale), int(255*(1-colorScale)), 0), point0.position, point1.position)
+        else:
+            deltaLength = (point0.position - point1.position).length()
+            # Use the distance to scale the color of the constraint along the parabola.
+            # 2 * c.distance is max, 0 is also max, c.distance is min
+            colorScale = (((deltaLength - c.distance) * (1/c.distance))  ** 2)
+            if colorScale > 1: colorScale = 1 # Cap the value at 1
+            
+            # Draw a line from point0 to point1, colored according to how far away from neutral they are
+            pg.draw.aaline(window, (50, 50, int(255 * colorScale)), point0.position, point1.position)
 
     for p in e.points:
         print(str(p) + " @ " + str(p.position))
