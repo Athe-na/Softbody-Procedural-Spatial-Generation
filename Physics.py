@@ -4,7 +4,7 @@ import math
 import pygame as pg
 
 class PointMass:
-    radius = 10
+    radius = 5
     IDCounter = 0
 
     def __init__(self, position: pg.Vector2, velocity: pg.Vector2, acceleration: pg.Vector2):
