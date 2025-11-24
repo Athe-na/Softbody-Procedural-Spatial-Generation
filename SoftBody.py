@@ -21,8 +21,8 @@ class SoftBody:
     def circle(self, vertexCount: int, radius: int) -> list[Vertex]: # Create a circle as specified
         # Start by doing some basic accounting
         divisions: float = 360/vertexCount
-        angle: pg.Vector2
+        angle: pg.Vector2 = pg.Vector2(1, 0)
         for v in range(vertexCount):
-            self.verticies.append()
+            pass
         
         return self.verticies
