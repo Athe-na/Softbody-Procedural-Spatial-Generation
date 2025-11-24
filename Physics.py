@@ -4,7 +4,7 @@ import math
 import pygame as pg
 
 class PointMass:
-    radius = 20
+    radius = 10
     IDCounter = 0
 
     def __init__(self, position: pg.Vector2, velocity: pg.Vector2, acceleration: pg.Vector2):
@@ -18,6 +18,14 @@ class PointMass:
     def __str__(self):
         return "Point" + str(self.id)
     
+    def __eq__(self, value: object) -> bool:
+        if self.__str__ == object.__str__:
+            return True
+        return False
+
+def cross(a: pg.Vector2, b: pg.Vector2):
+    return a.x * b.y - a.y * b.x
+
 class Wall:
     IDCounter = 0
 
@@ -52,7 +60,7 @@ class Collision:
 
 class Constraint:
     
-    def __init__(self, index0: int, index1: int, distance: float, hard:bool =False, springConst: float=1):
+    def __init__(self, index0: int, index1: int, distance: float, hard:bool =False, springConst: float=5):
         self.index0 = index0
         self.index1 = index1
         self.distance = distance
@@ -246,7 +254,6 @@ class Engine:
             
             # With all this, create distanceC
             
-
         return Collisions
 
     def resolveCollisions(self, p: PointMass, points: list[PointMass], walls: list[Wall]) -> list[pg.Vector2]:
