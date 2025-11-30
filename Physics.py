@@ -4,7 +4,7 @@ import math
 import pygame as pg
 
 class PointMass:
-    radius = 5
+    radius = 1
     IDCounter = 0
 
     def __init__(self, position: pg.Vector2, velocity: pg.Vector2, acceleration: pg.Vector2):
@@ -69,13 +69,118 @@ class Constraint:
 
     def __str__(self):
         return "point" + str(self.index0) + "!point" + str(self.index1) + " < " + str(self.distance) + ":" + str(self.hard)
+
+class SoftBody:
+
+    IDCounter = 0
+
+    def __init__(self) -> None:
+        self.id = self.IDCounter
+        self.points: list[PointMass]
+        self.constraints: list[Constraint]
+        self.outerPointID: list[int] # This list will include one point twice at the beginning and end for easy iteration
+        self.scale: float
+        self.IDCounter += 1
     
+    def dottedSquare(self, width: float, height: float, pos: pg.Vector2):
+
+        # Initialize width and height vectors (facing down and right)
+        widthVec = pg.Vector2(1, 0) * width
+        heightVec = pg.Vector2(0, 1) * height
+
+        # Create points in all four corners
+        topRight = PointMass(pos + widthVec/2 - heightVec/2, pg.Vector2(0,0), pg.Vector2(0,0))
+        topLeft = PointMass(pos - widthVec/2 - heightVec/2, pg.Vector2(0,0), pg.Vector2(0,0))
+        botLeft = PointMass(pos - widthVec/2 + heightVec/2, pg.Vector2(0,0), pg.Vector2(0,0))
+        botRight = PointMass(pos + widthVec/2 + heightVec/2, pg.Vector2(0,0), pg.Vector2(0,0))
+        # And in the center
+        center = PointMass(pos, pg.Vector2(0,0), pg.Vector2(0,0))
+
+        # Link points together
+        # Outers
+        self.constraints.append(Constraint(topRight.id, topLeft.id, width))
+        self.constraints.append(Constraint(topLeft.id, botLeft.id, height))
+        self.constraints.append(Constraint(botLeft.id, botRight.id, width))
+        self.constraints.append(Constraint(botRight.id, topRight.id, height))
+        
+        # Inners
+        self.constraints.append(Constraint(topRight.id, center.id, (widthVec/2 + heightVec/2).length()))
+        self.constraints.append(Constraint(topLeft.id, center.id, (widthVec/2 + heightVec/2).length()))
+        self.constraints.append(Constraint(botLeft.id, center.id, (widthVec/2 + heightVec/2).length()))
+        self.constraints.append(Constraint(botRight.id, center.id, (widthVec/2 + heightVec/2).length()))
+
+        # Put outers on outerPointID
+        self.outerPointID.extend([topRight.id, topLeft.id, botLeft.id, botRight.id, topRight.id])
+
+        return self
+    
+
+    def scaleShapeMult(self, delta: float):
+        for c in self.constraints:
+            c.distance *= delta
+        return self
+    
+    def scaleShapeAdd(self, delta: float): # Probably never going to use this lol but could be funny
+        for c in self.constraints:
+            c.distance += delta
+        return self
+
+class Vertex:
+
+    IDCounter: int = 0
+
+    def __init__(self, position: pg.Vector2, direction: pg.Vector2 = pg.Vector2(0, 0), stiffness: float = 0) -> None:
+        self.position: pg.Vector2 = position
+        self.id = self.IDCounter
+        self.direction = direction # The direction along which it prefers to move along. Useful for hallways primarily I think
+        self.stiffness = stiffness # How much pushes will be redirected along the direction
+        self.IDCounter += 1
+'''
+class SoftBody: # Possibly obsolete
+            
+    def __init__(self) -> None:
+        self.verticies: list[Vertex] # This is the list of unmoving abstract verticies that compose the ideal shape
+        self.scale: float
+        self.indexMin: int
+        self.indexMax: int
+
+    def circle(self, vertexCount: int, radius: int): # Create a circle as specified
+        # Start by doing some basic accounting
+        divisions: float = 360/vertexCount
+        angle: pg.Vector2 = pg.Vector2(1, 0)
+
+        # Then create verticies at the set angle intervals such that we create a circle of verticies at the given radius
+        for v in range(vertexCount):
+            newVert = Vertex(angle * radius)
+            if v == 0: # If the loop index is 0, this will be the min id for verticies for this soft body.
+                self.indexMin = newVert.id
+            if v == vertexCount - 1: # Oppositely, if it's the last index, set it to be the max id for this soft body
+                self.indexMax = newVert.id
+            self.verticies.append(newVert) # Create a point
+            angle.rotate_ip(divisions) # Rotate the angle in place.
+        
+        print("Created circle")
+        return self
+'''
+
+
+
+class Resolution:
+    def __init__(self, id: int, pos: pg.Vector2, vel: pg.Vector2, accel: pg.Vector2) -> None:
+        self.pointID = id
+        self.position = pos
+        self.velocity = vel
+        self.acceleration = accel
+
 class Engine:
     
-    def __init__(self, points: list[PointMass], walls: list[Wall], constraints: list[Constraint], elasticity: float, friction: float, springDamping: float, WIDTH: int, HEIGHT: int):
-        self.points: list[PointMass] = points
+    def __init__(self, softBodies: list[SoftBody], walls: list[Wall], elasticity: float, friction: float, springDamping: float, WIDTH: int, HEIGHT: int):
+        
+        self.softBodies: list[SoftBody] = softBodies
+        self.points: list[PointMass]
+        for b in self.softBodies:
+            self.points.extend(b.points)
         self.walls: list[Wall] = walls
-        self.constraints: list[Constraint] = constraints
         self.elasticity: float = elasticity
         self.friction: float = friction
         self.springDamping: float = springDamping
@@ -95,9 +200,9 @@ class Engine:
 
         # Check for the various types of forces and other things we need to apply to each point
         for p in self.points:
-
             # Check for point2point and bounding collisions and append to resolution list
             resolutions.append(self.resolveCollisions(p, self.points, self.walls))
+            
             
         for c in self.constraints: # For each constraint, identify the points involved and update their resolution based on the constraint
             
@@ -187,8 +292,11 @@ class Engine:
                 sumVel0 -= relVelocityDelta
                 sumVel1 += relVelocityDelta
 
+                # Add this to the current resolution for that point
                 resolutions[c.index0][1] += sumVel0
                 resolutions[c.index1][1] += sumVel1
+
+        
 
         for rep in range(len(self.points)):
             self.points[rep].position += resolutions[rep][0]
@@ -306,6 +414,18 @@ class Engine:
         #once we've gathered the sum of the effects of all collisions, bundle them and return it to the upper layer for eventual execution
         return [sumPos, sumVel]
     
-    def resolveWallCollisions(self, p: PointMass, walls: list[Wall]) -> tuple[pg.Vector2, pg.Vector2]:
+
+    # Check for point to edge collision
+    # Can do this by projecting the point onto the edge and creating a circle at that point equal to the width of the edge.
+    # If the circles intersect, collision
+    def findEdgeCollisions(self, p: PointMass, points: list[PointMass], edges: list[Constraint]) -> list[Collision]:
+        
+        for e in edges: # For each edge
+            surf: pg.Vector2 = points[e.index0].position - points[e.index1].position # Create a vector pointing from p0 to p1
+            projector: pg.Vector2 = p.position - points[e.index0].position # Determine where 
+
+        return [Collision()]
+
+    def resolveEdgeCollisions(self, p: PointMass, c: Constraint) -> tuple[pg.Vector2, pg.Vector2]:
         pass 
         return(pg.Vector2(0,0), pg.Vector2(0,0))

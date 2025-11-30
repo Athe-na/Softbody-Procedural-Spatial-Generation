@@ -6,7 +6,7 @@ import sys
 import math
 import random
 from Dinosaur import Dinosaur
-from Physics import Engine, PointMass, Wall, Constraint, cross
+from Physics import Engine, PointMass, Wall, Constraint, SoftBody, cross
 
 def main():
 
@@ -22,42 +22,21 @@ def main():
     #initialize the window
     window = pg.display.set_mode((WIDTH, HEIGHT))
     window.fill((255,255,255))
-    
-    
-    #provide some initial points
-    points: list[PointMass] = [PointMass(pg.Vector2(200, 100), pg.Vector2(0, 0), pg.Vector2(0, 0)),
-                               PointMass(pg.Vector2(250, 100), pg.Vector2(0, 0), pg.Vector2(0, 0)),
-                               PointMass(pg.Vector2(175, 175), pg.Vector2(40, -140), pg.Vector2(0, 0))
-                                ]
-    #points.append(PointMass(pg.Vector2(300, 100), pg.Vector2(-10, 0), pg.Vector2(0, 0)))
+        
+    # Create a list of SoftBodies
+    softBodies: list[SoftBody] = [SoftBody().dottedSquare(10, 50, pg.Vector2(100,100))]
 
-    constraints: list[Constraint] = [Constraint(0, 1, 100, False, springConst=5),
-                                     Constraint(1, 2, 240, True)
-                                    ]
+    # Based on the verticies in those soft bodies, create PointMasses
+
+    # Based on the list of soft bodies, append to points.
 
     # Provide initial walls (NOT CURRENTLY IN USE)
     walls: list[Wall] = [Wall(pg.Vector2(0,0), pg.Vector2(100,0), 5)]
 
-    circle: list[PointMass] = [PointMass(pg.Vector2(300, 300), pg.Vector2(0, 0), pg.Vector2(0, 0)),
-                                ]
-    depth: int = 10
-    unit: pg.Vector2 = pg.Vector2(1, 0)
-    indexOffset = len(points)
-    for i in range(depth):
-        newPoint = PointMass(pg.Vector2(300, 300) + (unit * 40), pg.Vector2(random.randint(0, 100), random.randint(0, 100)), pg.Vector2(0, 0))
-        circle.append(newPoint)
-        constraints.append(Constraint(circle[0].id, newPoint.id, 100, springConst=5)) # Append spoke constraints
-        if i != depth-1:
-            constraints.append(Constraint(newPoint.id, newPoint.id + 1, 50, hard=True)) # Append wheel constraints
-        else:
-            print("Appending last point " + str(newPoint.id))
-            constraints.append(Constraint(newPoint.id, indexOffset + 1, 50, hard=True))
-        unit.rotate_ip(360/depth)
     
-    points.extend(circle)
 
     #initialize the engine
-    e = Engine(points, walls, constraints, 0.75, 0.5, 2, WIDTH, HEIGHT)
+    e = Engine(softBodies, walls, 0.75, 0.5, 2, WIDTH, HEIGHT)
     drawEngine(e, window)
     pg.display.update()
 
@@ -115,7 +94,12 @@ def main():
         window.fill((255, 255, 255))
         drawEngine(e, window)
         pg.display.update()            
-        dt = clock.tick(60)/1000                    
+        dt = clock.tick(60)/1000
+
+def addPointMassesFromSoftBodies(bodies: list[SoftBody]) -> list[PointMass]:
+
+    return []
+
         
 def drawEngine(e: Engine, window):
     for c in e.constraints:
