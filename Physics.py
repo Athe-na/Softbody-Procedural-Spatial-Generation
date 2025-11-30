@@ -4,7 +4,7 @@ import math
 import pygame as pg
 
 class PointMass:
-    radius = 1
+    radius = 2
     IDCounter = 0
 
     def __init__(self, position: pg.Vector2, velocity: pg.Vector2, acceleration: pg.Vector2):
@@ -163,8 +163,6 @@ class SoftBody: # Possibly obsolete
         return self
 '''
 
-
-
 class Resolution:
     def __init__(self, id: int, pos: pg.Vector2, vel: pg.Vector2, accel: pg.Vector2) -> None:
         self.pointID = id
@@ -192,7 +190,7 @@ class Engine:
     def update(self, dt):
 
         # Initialize a resolutions array
-        resolutions: list[list[pg.Vector2]] = []
+        resolutions: list[Resolution] = []
 
         #update position as the current position plus the velocity x the change in time
         for p in self.points:
@@ -200,9 +198,10 @@ class Engine:
 
         # Check for the various types of forces and other things we need to apply to each point
         for p in self.points:
-            # Check for point2point and bounding collisions and append to resolution list
-            resolutions.append(self.resolveCollisions(p, self.points, self.walls))
-            
+            # Check for point2point, bounding, and edge collisions and append to resolution list
+            resolution = self.resolveCollisions(p)
+            if resolution != None:
+                resolutions.append(self.resolveCollisions(p))
             
         for c in self.constraints: # For each constraint, identify the points involved and update their resolution based on the constraint
             
@@ -262,10 +261,9 @@ class Engine:
                     
 
                     # Add the calculated sumPos and forces to the resolutions array for the appropriate point
-                    resolutions[c.index0][0] += sumPos0
-                    resolutions[c.index1][0] += sumPos1
-                    resolutions[c.index0][1] -= force0
-                    resolutions[c.index1][1] -= force1
+                    resolutions.append(Resolution(c.index0, sumPos0, -force0, pg.Vector2(0,0)))
+                    resolutions.append(Resolution(c.index1, sumPos1, -force1, pg.Vector2(0,0)))
+                    
             else: # If the constraint isn't hard, then apply dampened force towards the desired distance according to the spring constant
                 
                 normal: pg.Vector2 = delta / distance # Find the normal
@@ -293,24 +291,22 @@ class Engine:
                 sumVel1 += relVelocityDelta
 
                 # Add this to the current resolution for that point
-                resolutions[c.index0][1] += sumVel0
-                resolutions[c.index1][1] += sumVel1
+                resolutions.append(Resolution(c.index0, sumPos0, sumVel0, pg.Vector2(0,0)))
+                resolutions.append(Resolution(c.index1, sumPos1, sumVel1, pg.Vector2(0,0)))
 
-        
+        for r in range(len(resolutions)): # For each item in the resolutions array, apply the resolution to its designated point
+            self.points[resolutions[r].pointID].position += resolutions[r].position
+            self.points[resolutions[r].pointID].velocity += resolutions[r].velocity
+            self.points[resolutions[r].pointID].acceleration += resolutions[r].acceleration
+            
+            print("Resolved " + str(self.points[resolutions[r].pointID]) + " to " + str(self.points[resolutions[r].pointID].velocity) + "(" + str(round(self.points[resolutions[r].pointID].velocity.magnitude(), 2)) + ")@" + str(self.points[resolutions[r].pointID].position))
 
-        for rep in range(len(self.points)):
-            self.points[rep].position += resolutions[rep][0]
-            self.points[rep].velocity += resolutions[rep][1]
-            print("Resolved " + str(self.points[rep]) + " to " + str(self.points[rep].velocity) + "(" + str(round(self.points[rep].velocity.magnitude(), 2)) + ")@" + str(self.points[rep].position))
-        #once all resolutions are collected, apply them!
-
-
-    # creates Collisions for all sets of particles with respect to a particle p
-    def findCollision(self, p: PointMass, points: list[PointMass], walls: list[Wall]) -> list[Collision]:   
+    # creates Collisions for particle p with respect to all other particles
+    def findCollision(self, p: PointMass) -> list[Collision]:   
 
         #remove p from points to avoid considering consideration of self collision. 
         #This works since structural changes aren't back propogated in a shallow copy
-        copy = points.copy()
+        copy = self.points.copy()
         copy.remove(p)
 
         Collisions: list[Collision] = []
@@ -340,39 +336,20 @@ class Engine:
             normal: pg.Vector2 = delta/distance
             depth: float = p.radius + q.radius - distance
             Collisions.append(Collision(normal, depth, p.velocity, q.velocity, False))
-        
-    
-        # Find Wall collisions (NOT CURRENTLY IN USE)
-        for w in walls:
-            # Take delta from each endpoint
-            delta0: pg.Vector2 = p.position - w.pos0
-            delta1: pg.Vector2 = p.position - w.pos1
-
-            # Calculate Tangent to flat part of wall
-            flatTangent: pg.Vector2 = (w.pos0 - w.pos1).normalize()
-
-            # And use that to calculate the normal
-            flatNormal: pg.Vector2 = pg.Vector2(0, 0)
-            flatNormal.xy = flatTangent.yx
-            flatNormal.y *= -1
-
-            # Make sure the normal is oriented in the right direction by checking to see whether adding it takes us closer or farther from the wall
-            if (p.position + flatNormal).distance_to(w.center) < p.position.distance_to(w.center): # If not, reverse it
-                flatNormal *= -1
-            
-            # With all this, create distanceC
             
         return Collisions
 
-    def resolveCollisions(self, p: PointMass, points: list[PointMass], walls: list[Wall]) -> list[pg.Vector2]:
+    # Resolves Collisions for particle p with respect to all other particles
+    def resolveCollisions(self, p: PointMass) -> Resolution:
         #create a prev variable to store the previous position so we can calculate change in velocity
         prev = p.position
         #create a list of point collisions
-        collisions: list[Collision] = self.findCollision(p, points, walls)
+        collisions: list[Collision] = self.findCollision(p)
 
         #if there are multiple collisions, we want to be able to sum the position and velocity effects
         sumPos = pg.Vector2(0, 0)
         sumVel = pg.Vector2(0, 0)
+        sumAccel = pg.Vector2(0, 0)
 
         #for each collision
         for c in collisions:
@@ -410,22 +387,26 @@ class Engine:
                 sumVel -= force
 
                 print("Adding to " + str(p) + str(sumVel))
-                
-        #once we've gathered the sum of the effects of all collisions, bundle them and return it to the upper layer for eventual execution
-        return [sumPos, sumVel]
+            
+                for c in self.constraints: # each constraint acts as an edge, so we iterate through edges to check for collision
+                    # Can do this by projecting the point onto the edge and determining the point's distance from that projection
+                    surf: pg.Vector2 = self.points[c.index1].position - self.points[c.index0].position
+                    relocate: pg.Vector2 = p.position - self.points[c.index0].position
+
+                    if relocate.project(surf).magnitude() < surf.magnitude() and relocate.project(surf).magnitude() > 0: # If the projection would fall on the edge
+                        # If the circles intersect, collision
+                        self.resolveEdgeCollision(p, c, surf, relocate)
+
+                        # NOTE: Need to add duplication culling for colliding with an edge AND its point
+            else:
+                return None 
+        # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
+        # and return it to the upper layer for eventual execution
+        return Resolution(p.id, sumPos, sumVel, sumAccel)
     
+    def resolveEdgeCollision(self, p: PointMass, c: Constraint, surf: pg.Vector2, relocate: pg.Vector2):
+        pass
 
     # Check for point to edge collision
-    # Can do this by projecting the point onto the edge and creating a circle at that point equal to the width of the edge.
-    # If the circles intersect, collision
-    def findEdgeCollisions(self, p: PointMass, points: list[PointMass], edges: list[Constraint]) -> list[Collision]:
-        
-        for e in edges: # For each edge
-            surf: pg.Vector2 = points[e.index0].position - points[e.index1].position # Create a vector pointing from p0 to p1
-            projector: pg.Vector2 = p.position - points[e.index0].position # Determine where 
-
-        return [Collision()]
-
-    def resolveEdgeCollisions(self, p: PointMass, c: Constraint) -> tuple[pg.Vector2, pg.Vector2]:
-        pass 
-        return(pg.Vector2(0,0), pg.Vector2(0,0))
+   
+    
