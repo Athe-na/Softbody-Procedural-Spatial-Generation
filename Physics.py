@@ -4,7 +4,7 @@ import math
 import pygame as pg
 
 class PointMass:
-    radius = 2
+    radius = 5
     IDCounter = 0
 
     def __init__(self, position: pg.Vector2, velocity: pg.Vector2, acceleration: pg.Vector2):
@@ -76,41 +76,55 @@ class SoftBody:
 
     def __init__(self) -> None:
         self.id = self.IDCounter
-        self.points: list[PointMass]
-        self.constraints: list[Constraint]
-        self.outerPointID: list[int] # This list will include one point twice at the beginning and end for easy iteration
-        self.scale: float
+        self.points: list[PointMass] = []
+        self.constraints: list[Constraint] = []
+        self.outerConstraintsID: list[int] = [] # The list of indexes which correspond to outer edges in self.constraints
+        self.scale: float = 1
         self.IDCounter += 1
+        print("Initialized softbody " + str(self.id))
+        print("Constraints: " + str(self.constraints))
     
-    def dottedSquare(self, width: float, height: float, pos: pg.Vector2):
+    def dottedRect(self, width: float, height: float, pos: pg.Vector2):
+        '''
+        Creates a rectangular arrangement of interconnected PointMasses with a PointMass in the middle
 
+        Parameters
+        ----------
+        pos : pg.Vector2
+            The position of the central PointMass
+        '''
         # Initialize width and height vectors (facing down and right)
         widthVec = pg.Vector2(1, 0) * width
         heightVec = pg.Vector2(0, 1) * height
 
         # Create points in all four corners
-        topRight = PointMass(pos + widthVec/2 - heightVec/2, pg.Vector2(0,0), pg.Vector2(0,0))
-        topLeft = PointMass(pos - widthVec/2 - heightVec/2, pg.Vector2(0,0), pg.Vector2(0,0))
-        botLeft = PointMass(pos - widthVec/2 + heightVec/2, pg.Vector2(0,0), pg.Vector2(0,0))
-        botRight = PointMass(pos + widthVec/2 + heightVec/2, pg.Vector2(0,0), pg.Vector2(0,0))
+        topRight = self.addPointAtPos(pos + widthVec/2 - heightVec/2)
+        topLeft = self.addPointAtPos(pos - widthVec/2 - heightVec/2)
+        botLeft = self.addPointAtPos(pos - widthVec/2 + heightVec/2)
+        botRight = self.addPointAtPos(pos + widthVec/2 + heightVec/2)
+
         # And in the center
-        center = PointMass(pos, pg.Vector2(0,0), pg.Vector2(0,0))
+        center = self.addPointAtPos(pos)
 
         # Link points together
         # Outers
-        self.constraints.append(Constraint(topRight.id, topLeft.id, width))
-        self.constraints.append(Constraint(topLeft.id, botLeft.id, height))
-        self.constraints.append(Constraint(botLeft.id, botRight.id, width))
-        self.constraints.append(Constraint(botRight.id, topRight.id, height))
+        self.constraints.append(Constraint(topRight, topLeft, width))
+        self.outerConstraintsID.append(0)
+        self.constraints.append(Constraint(topLeft, botLeft, height))
+        self.outerConstraintsID.append(1)
+        self.constraints.append(Constraint(botLeft, botRight, width))
+        self.outerConstraintsID.append(2)
+        self.constraints.append(Constraint(botRight, topRight, height))
+        self.outerConstraintsID.append(3)
         
         # Inners
-        self.constraints.append(Constraint(topRight.id, center.id, (widthVec/2 + heightVec/2).length()))
-        self.constraints.append(Constraint(topLeft.id, center.id, (widthVec/2 + heightVec/2).length()))
-        self.constraints.append(Constraint(botLeft.id, center.id, (widthVec/2 + heightVec/2).length()))
-        self.constraints.append(Constraint(botRight.id, center.id, (widthVec/2 + heightVec/2).length()))
+        self.constraints.append(Constraint(topRight, center, (widthVec/2 + heightVec/2).length()))
+        self.constraints.append(Constraint(topLeft, center, (widthVec/2 + heightVec/2).length()))
+        self.constraints.append(Constraint(botLeft, center, (widthVec/2 + heightVec/2).length()))
+        self.constraints.append(Constraint(botRight, center, (widthVec/2 + heightVec/2).length()))
 
         # Put outers on outerPointID
-        self.outerPointID.extend([topRight.id, topLeft.id, botLeft.id, botRight.id, topRight.id])
+        self.outerConstraintsID.extend([topRight, topLeft, botLeft, botRight, topRight])
 
         return self
     
@@ -125,6 +139,24 @@ class SoftBody:
             c.distance += delta
         return self
 
+    def addPointAtPos(self, pos: pg.Vector2):
+        '''Helper method for creating a point at a specified position.
+        
+        Parameters
+        ----------
+        pos : pg.Vector2
+            Position of created point. (Noooooooooo...)
+
+        Returns
+        -------
+        int
+            id of created PointMass
+        '''
+        # Add the point to the point list, creating it at the specified spot
+        point = PointMass(pos, pg.Vector2(0,0), pg.Vector2(0,0))
+        self.points.append(point)
+        return point.id
+        
 class Vertex:
 
     IDCounter: int = 0
@@ -175,16 +207,19 @@ class Engine:
     def __init__(self, softBodies: list[SoftBody], walls: list[Wall], elasticity: float, friction: float, springDamping: float, WIDTH: int, HEIGHT: int):
         
         self.softBodies: list[SoftBody] = softBodies
-        self.points: list[PointMass]
+        self.points: list[PointMass] = []
+        self.constraints: list[Constraint] = []
         for b in self.softBodies:
             self.points.extend(b.points)
+            self.constraints.extend(b.constraints)
         self.walls: list[Wall] = walls
         self.elasticity: float = elasticity
         self.friction: float = friction
         self.springDamping: float = springDamping
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
-        self.constraints: list[Constraint]
+        self.constraints: list[Constraint] = []
+        
 
     #update method that we'll call to simulate one "tick" of physics
     def update(self, dt):
@@ -399,7 +434,7 @@ class Engine:
 
                         # NOTE: Need to add duplication culling for colliding with an edge AND its point
             else:
-                return None 
+                pass
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
         # and return it to the upper layer for eventual execution
         return Resolution(p.id, sumPos, sumVel, sumAccel)
