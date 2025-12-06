@@ -82,8 +82,16 @@ class SoftBody:
         self.scale: float = 1
         self.IDCounter += 1
         print("Initialized softbody " + str(self.id))
-        print("Constraints: " + str(self.constraints))
+        print("Constraints initialized in SoftBody: " + str(self.constraints))
     
+    def dot(self, pos: pg.Vector2):
+        '''
+        Creates a body consisting of a singular PointMass at the specified position
+        '''
+        self.addPointAtPos(pos)
+
+        return self
+
     def dottedRect(self, width: float, height: float, pos: pg.Vector2):
         '''
         Creates a rectangular arrangement of interconnected PointMasses with a PointMass in the middle
@@ -218,11 +226,13 @@ class Engine:
         self.springDamping: float = springDamping
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
-        self.constraints: list[Constraint] = []
-        
 
-    #update method that we'll call to simulate one "tick" of physics
+        self.points.append(PointMass(pg.Vector2(175, 100), pg.Vector2(-200, 0), pg.Vector2(0, 0)))
+
     def update(self, dt):
+        '''
+        Function that simulates one "tick" of physics, where the length of the tick is dictated by the dt variable.
+        '''
 
         # Initialize a resolutions array
         resolutions: list[Resolution] = []
@@ -237,8 +247,12 @@ class Engine:
             resolution = self.resolveCollisions(p)
             if resolution != None:
                 resolutions.append(self.resolveCollisions(p))
-            
-        for c in self.constraints: # For each constraint, identify the points involved and update their resolution based on the constraint
+
+        '''
+        CONSTRAINT RESOLUTION
+        For each constraint, identify the points involved and update their resolution based on the constraint
+        '''
+        for c in self.constraints: 
             
             # Grab position values for the two involved points
             p0 = self.points[c.index0].position
@@ -301,6 +315,9 @@ class Engine:
                     
             else: # If the constraint isn't hard, then apply dampened force towards the desired distance according to the spring constant
                 
+                sumPos0: pg.Vector2 = pg.Vector2(0,0)
+                sumPos1: pg.Vector2 = pg.Vector2(0,0)
+
                 normal: pg.Vector2 = delta / distance # Find the normal
                 targetDelta: pg.Vector2 = normal * c.distance # Find the desired position along that normal
                 force: pg.Vector2 = (targetDelta - delta) * c.springConst # Find undampened force based on desired minus actual times constant
@@ -328,6 +345,9 @@ class Engine:
                 # Add this to the current resolution for that point
                 resolutions.append(Resolution(c.index0, sumPos0, sumVel0, pg.Vector2(0,0)))
                 resolutions.append(Resolution(c.index1, sumPos1, sumVel1, pg.Vector2(0,0)))
+        '''
+        END CONSTRAINT RESOLUTION
+        '''
 
         for r in range(len(resolutions)): # For each item in the resolutions array, apply the resolution to its designated point
             self.points[resolutions[r].pointID].position += resolutions[r].position

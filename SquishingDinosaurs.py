@@ -24,7 +24,8 @@ def main():
     window.fill((255,255,255))
         
     # Create a list of SoftBodies
-    softBodies: list[SoftBody] = [SoftBody().dottedRect(50, 50, pg.Vector2(100,100))]
+    softBodies: list[SoftBody] = [SoftBody().dottedRect(50, 50, pg.Vector2(100,100)),
+                                  SoftBody().dot(pg.Vector2(200, 100))]
 
     # Based on the verticies in those soft bodies, create PointMasses
 
@@ -82,6 +83,7 @@ def main():
                                 if event.key == pg.K_SPACE: # if space is pressed again, unpause
                                     clock.tick(60)
                                     paused = False
+                                    dt = 60/1000
                                 if event.key == pg.K_s: #if s is pressed, step forward a frame
                                     print("Stepping forward")
                                     e.update(dt)
@@ -103,6 +105,7 @@ def addPointMassesFromSoftBodies(bodies: list[SoftBody]) -> list[PointMass]:
         
 def drawEngine(e: Engine, window):
     for c in e.constraints:
+       
         # Get points so we can grab their position and also calculate the distance between them
         point0: PointMass = e.points[c.index0]
         point1: PointMass = e.points[c.index1]
