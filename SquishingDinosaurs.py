@@ -129,8 +129,25 @@ def drawEngine(e: Engine, window):
             
             # Draw a line from point0 to point1, colored according to how far away from neutral they are
             pg.draw.aaline(window, (50, 50, int(255 * colorScale)), point0.position, point1.position)
-    for c in e.outerConstraints:
-        pass
+    for c in e.outerConstraints: # Draw the outer constraints as a set of two lines
+        
+        # Get points so we can grab their position and also calculate the distance between them
+        point0: PointMass = e.points[c.index0]
+        point1: PointMass = e.points[c.index1]
+
+        offset: pg.Vector2 = (point1.position - point0.position).rotate(90) # Grab the delta between them rotate that delta 90 degrees to get the offset vector
+        offset.scale_to_length(point0.radius * 0.9) # Scale the offset to nearly the radius length
+
+        # Create the four points based on the position +/- the offset
+        point0L: pg.Vector2 = point0.position + offset
+        point0R: pg.Vector2 = point0.position - offset
+        point1L: pg.Vector2 = point1.position - offset
+        point1R: pg.Vector2 = point1.position + offset
+
+        # Draw the two lines
+        pg.draw.aaline(window, (0,0,0), point0L, point1R)
+        pg.draw.aaline(window, (0,0,0), point0R, point1L)
+
 
     for p in e.points:
         print(str(p) + " @ " + str(p.position))
