@@ -104,7 +104,7 @@ def addPointMassesFromSoftBodies(bodies: list[SoftBody]) -> list[PointMass]:
 
         
 def drawEngine(e: Engine, window):
-    for c in e.constraints:
+    for c in e.innerConstraints: # draw inner constraints as single lines
        
         # Get points so we can grab their position and also calculate the distance between them
         point0: PointMass = e.points[c.index0]
@@ -129,6 +129,8 @@ def drawEngine(e: Engine, window):
             
             # Draw a line from point0 to point1, colored according to how far away from neutral they are
             pg.draw.aaline(window, (50, 50, int(255 * colorScale)), point0.position, point1.position)
+    for c in e.outerConstraints:
+        pass
 
     for p in e.points:
         print(str(p) + " @ " + str(p.position))

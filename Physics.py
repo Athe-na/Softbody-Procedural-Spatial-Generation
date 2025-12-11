@@ -77,12 +77,12 @@ class SoftBody:
     def __init__(self) -> None:
         self.id = self.IDCounter
         self.points: list[PointMass] = []
-        self.constraints: list[Constraint] = []
-        self.outerConstraintsID: list[int] = [] # The list of indexes which correspond to outer edges in self.constraints
+        self.innerConstraints: list[Constraint] = []
+        self.outerConstraints: list[Constraint] = [] # The list of indexes which correspond to outer edges in self.constraints
         self.scale: float = 1
         self.IDCounter += 1
         print("Initialized softbody " + str(self.id))
-        print("Constraints initialized in SoftBody: " + str(self.constraints))
+        print("Constraints initialized in SoftBody: " + str(self.innerConstraints + self.outerConstraints))
     
     def dot(self, pos: pg.Vector2):
         '''
@@ -116,34 +116,27 @@ class SoftBody:
 
         # Link points together
         # Outers
-        self.constraints.append(Constraint(topRight, topLeft, width))
-        self.outerConstraintsID.append(0)
-        self.constraints.append(Constraint(topLeft, botLeft, height))
-        self.outerConstraintsID.append(1)
-        self.constraints.append(Constraint(botLeft, botRight, width))
-        self.outerConstraintsID.append(2)
-        self.constraints.append(Constraint(botRight, topRight, height))
-        self.outerConstraintsID.append(3)
+        self.outerConstraints.append(Constraint(topRight, topLeft, width))
+        self.outerConstraints.append(Constraint(topLeft, botLeft, height))
+        self.outerConstraints.append(Constraint(botLeft, botRight, width))
+        self.outerConstraints.append(Constraint(botRight, topRight, height))
         
         # Inners
-        self.constraints.append(Constraint(topRight, center, (widthVec/2 + heightVec/2).length()))
-        self.constraints.append(Constraint(topLeft, center, (widthVec/2 + heightVec/2).length()))
-        self.constraints.append(Constraint(botLeft, center, (widthVec/2 + heightVec/2).length()))
-        self.constraints.append(Constraint(botRight, center, (widthVec/2 + heightVec/2).length()))
-
-        # Put outers on outerPointID
-        self.outerConstraintsID.extend([topRight, topLeft, botLeft, botRight, topRight])
+        self.innerConstraints.append(Constraint(topRight, center, (widthVec/2 + heightVec/2).length()))
+        self.innerConstraints.append(Constraint(topLeft, center, (widthVec/2 + heightVec/2).length()))
+        self.innerConstraints.append(Constraint(botLeft, center, (widthVec/2 + heightVec/2).length()))
+        self.innerConstraints.append(Constraint(botRight, center, (widthVec/2 + heightVec/2).length()))
 
         return self
     
 
     def scaleShapeMult(self, delta: float):
-        for c in self.constraints:
+        for c in self.outerConstraints + self.innerConstraints:
             c.distance *= delta
         return self
     
     def scaleShapeAdd(self, delta: float): # Probably never going to use this lol but could be funny
-        for c in self.constraints:
+        for c in self.outerConstraints + self.innerConstraints:
             c.distance += delta
         return self
 
@@ -216,10 +209,12 @@ class Engine:
         
         self.softBodies: list[SoftBody] = softBodies
         self.points: list[PointMass] = []
-        self.constraints: list[Constraint] = []
+        self.outerConstraints: list[Constraint] = []
+        self.innerConstraints: list[Constraint] = []
         for b in self.softBodies:
             self.points.extend(b.points)
-            self.constraints.extend(b.constraints)
+            self.outerConstraints.extend(b.outerConstraints)
+            self.innerConstraints.extend(b.innerConstraints)
         self.walls: list[Wall] = walls
         self.elasticity: float = elasticity
         self.friction: float = friction
@@ -252,7 +247,7 @@ class Engine:
         CONSTRAINT RESOLUTION
         For each constraint, identify the points involved and update their resolution based on the constraint
         '''
-        for c in self.constraints: 
+        for c in self.outerConstraints + self.innerConstraints: 
             
             # Grab position values for the two involved points
             p0 = self.points[c.index0].position
@@ -391,7 +386,27 @@ class Engine:
             normal: pg.Vector2 = delta/distance
             depth: float = p.radius + q.radius - distance
             Collisions.append(Collision(normal, depth, p.velocity, q.velocity, False))
-            
+
+        # Find PointMass to Edge collisions
+        for c in self.outerConstraints: # each constraint acts as an edge, so we iterate through edges to check for collision
+            # Can do this by projecting the point onto the edge and determining the point's distance from that projection
+
+            # Surf is a vector which has the length and angle of the constraint, but casts out from the origin.
+            surf: pg.Vector2 = self.points[c.index1].position - self.points[c.index0].position
+            # relocate is the point in question, but which exists relative to the origin in the same way it exists relative to the point at the beginning of the constraint
+            relocate: pg.Vector2 = p.position - self.points[c.index0].position
+            # proj is the relocated point projected onto the surface
+            proj: pg.Vector2 = relocate.project(surf)
+
+            # Thus, if the relocated point would project onto the length of the surface, it exists at the angle of the constraint's normal to SOME point on the constraint
+            if proj.magnitude() < surf.magnitude() and (proj + surf).magnitude() > surf.magnitude(): # If the projection would fall on the edge
+                
+                # Check the distance between the relocated point and its projection. If it's less than radius*2, then collision.
+                if (relocate - relocate.project(surf)).length() < p.radius*2:
+                    self.resolveEdgeCollision(p, c, surf, relocate)
+
+                # NOTE: Need to add duplication culling for colliding with an edge AND its point
+    
         return Collisions
 
     # Resolves Collisions for particle p with respect to all other particles
@@ -443,16 +458,7 @@ class Engine:
 
                 print("Adding to " + str(p) + str(sumVel))
             
-                for c in self.constraints: # each constraint acts as an edge, so we iterate through edges to check for collision
-                    # Can do this by projecting the point onto the edge and determining the point's distance from that projection
-                    surf: pg.Vector2 = self.points[c.index1].position - self.points[c.index0].position
-                    relocate: pg.Vector2 = p.position - self.points[c.index0].position
-
-                    if relocate.project(surf).magnitude() < surf.magnitude() and relocate.project(surf).magnitude() > 0: # If the projection would fall on the edge
-                        # If the circles intersect, collision
-                        self.resolveEdgeCollision(p, c, surf, relocate)
-
-                        # NOTE: Need to add duplication culling for colliding with an edge AND its point
+                
             else:
                 pass
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
