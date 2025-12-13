@@ -218,6 +218,8 @@ class Resolution:
         self.acceleration = accel
 
     def __eq__(self, value) -> bool: # As long as we never make cross type comparisons, this should act correctly.
+        if value == None:
+            return False
         if str(self.pointID) == str(value.pointID):
             return True
         return False
@@ -251,7 +253,7 @@ class Engine:
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
 
-        self.points.append(PointMass(pg.Vector2(175, 110), pg.Vector2(-150, 0), pg.Vector2(0, 0)))
+        self.points.append(PointMass(pg.Vector2(175, 100), pg.Vector2(-150, 0), pg.Vector2(0, 0)))
 
     def update(self, dt):
         '''
@@ -278,9 +280,8 @@ class Engine:
             resolution = self.resolveEdgeCollisions(p)
             for i in range(len(resolution)):
                 resolutions = self.addOrAmendResolution(resolutions, resolution[i])
-            print(str(resolutions))
 
-        print("res3 " + str(resolutions[3]))
+        print("res3 collisions " + str(resolutions[3]))
             
 
         '''
@@ -348,7 +349,7 @@ class Engine:
                     resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index0, sumPos0, -force0, pg.Vector2(0,0)))
                     resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index1, sumPos1, -force1, pg.Vector2(0,0)))
 
-                    print("res3 " + str(resolutions[3]))
+                    print("res3 hard constraints" + str(resolutions[3]))
                     
             else: # If the constraint isn't hard, then apply dampened force towards the desired distance according to the spring constant
                 
@@ -383,12 +384,15 @@ class Engine:
                 resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index0, sumPos0, sumVel0, pg.Vector2(0,0)))
                 resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index1, sumPos1, sumVel1, pg.Vector2(0,0)))
 
-                print("res3 " + str(resolutions[3]))
+                print("res3 soft constraints " + str(resolutions[3]))
         '''
         END CONSTRAINT RESOLUTION
         '''
 
         for r in range(len(resolutions)): # For each item in the resolutions array, apply the resolution to its designated point
+            
+            print("Preresolution: " + str(self.points[resolutions[r].pointID]) + " to " + str(self.points[resolutions[r].pointID].velocity) + "(" + str(round(self.points[resolutions[r].pointID].velocity.magnitude(), 2)) + ")@" + str(self.points[resolutions[r].pointID].position))
+
             self.points[resolutions[r].pointID].position += resolutions[r].position
             self.points[resolutions[r].pointID].velocity += resolutions[r].velocity
             self.points[resolutions[r].pointID].acceleration += resolutions[r].acceleration
@@ -480,7 +484,7 @@ class Engine:
 
                 sumVel -= force
 
-                print("Adding to " + str(p) + str(sumVel))
+                print("Point2Point: Adding to " + str(p) + str(sumVel))
             
         if noCollisions:
             return None
@@ -559,7 +563,7 @@ class Engine:
 
                     sumVel -= impulse
 
-                    print("Adding to " + str(p) + str(sumVel))
+                    print("Edge: Adding to " + str(p) + str(sumVel))
                     
                     # COLLISION RESOLUTION FOR POINTS ON CONSTRAINT
 
@@ -574,6 +578,8 @@ class Engine:
                     # Tangential force (friction)
                     sumVel0 += relMomentumT/3 * self.friction
 
+                    print("Adding to point0 " + str(sumVel0))
+
                     # Resolution for point 1
                     # Elastic force (normal)
                     sumVel1: pg.Vector2 = slider * relMomentumN * self.elasticity
@@ -581,6 +587,8 @@ class Engine:
                     sumVel1 += relMomentum/3 * (1-self.elasticity)
                     # Tangential force (friction)
                     sumVel1 += relMomentumT/3 * self.friction
+
+                    print("Adding to point1 " + str(sumVel1))
         
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
         # and return it to the upper layer for eventual execution
@@ -589,11 +597,10 @@ class Engine:
     def addOrAmendResolution(self, resolutions: list[Resolution], toAdd: Resolution) -> list[Resolution]:
         for r in resolutions:
             if r == toAdd:
-                print("Amend " + str(r.velocity) + " to " + str(r + toAdd))
+                print("For " + str(r) + " Amend " + str(r.velocity) + " to " + str(r + toAdd))
                 r += toAdd
                 
                 return resolutions
-            print(str(r) + str(toAdd))
         
         resolutions.append(toAdd)
         print("Add")

@@ -1,5 +1,7 @@
 # Authored by Athena Osborne
 
+import ctypes
+
 import pygame as pg
 import io
 import sys
@@ -10,16 +12,24 @@ from Physics import Engine, PointMass, Wall, Constraint, SoftBody, cross
 
 def main():
 
+    # Code to undo display scaling from
+    # https://stackoverflow.com/questions/44398075/can-dpi-scaling-be-enabled-disabled-programmatically-on-a-per-session-basis
+    awareness = ctypes.c_int()
+    errorCode = ctypes.windll.shcore.GetProcessDpiAwareness(0, ctypes.byref(awareness))
+    print(awareness.value)
+    errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(1)
+
+    # Seed the random function for later use with proc gen.
     random.seed(int(sys.argv[4]))
 
-    #initialize pygame
+    # Initialize pygame
     pg.init()
 
-    #Begin by creating gen area
+    # Begin by creating gen area (and window size)
     WIDTH = int(sys.argv[1])
     HEIGHT = int(sys.argv[2])
 
-    #initialize the window
+    # Initialize the window
     window = pg.display.set_mode((WIDTH, HEIGHT))
     window.fill((255,255,255))
         
@@ -29,26 +39,24 @@ def main():
                                   SoftBody().dot(pg.Vector2(200, 110)),
                                   SoftBody().line(pg.Vector2(100, 100), pg.Vector2(100, 150))]
 
-    # Based on the verticies in those soft bodies, create PointMasses
-
-    # Based on the list of soft bodies, append to points.
-
     # Provide initial walls (NOT CURRENTLY IN USE)
     walls: list[Wall] = [Wall(pg.Vector2(0,0), pg.Vector2(100,0), 5)]
 
     
-
-    #initialize the engine
+    # Initialize the engine
     e = Engine(softBodies, walls, 0.75, 0.5, 2, WIDTH, HEIGHT)
     drawEngine(e, window)
     pg.display.update()
 
-    #initialize sim clock and other guts of program
+    # Initialize sim clock and other guts of program
     clock = pg.time.Clock()
     running = True
     dt = 0
 
+    # By default, do not pause the program on the first frame.
     firstFramePause = False
+
+    # If the 3rd arg is a 1, the program will initialize and stop on the first frame, going into a "stepping" mode.
     if str(sys.argv[3]) == "1":
         print("Paused first frame")
         e.update(dt)
@@ -57,13 +65,14 @@ def main():
         pg.display.update()            
         dt = 60/1000
         firstFramePause = True
+
         while firstFramePause:
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     firstFramePause = False
                     running = False
                 if event.type == pg.KEYDOWN:
-                    if event.key == pg.K_SPACE:
+                    if event.key == pg.K_SPACE: # This has a known error where dt is calculated as total elapsed time after unpausing from stepping mode
                         firstFramePause = False
                         dt = 60/1000
                     if event.key == pg.K_s:
@@ -108,9 +117,10 @@ def main():
         pg.display.update()            
         dt = clock.tick(60)/1000
 
+    print("Sim ended.")
         
 def drawEngine(e: Engine, window):
-    for c in e.innerConstraints: # draw inner constraints as single lines
+    for c in e.innerConstraints: # Loop to draw inner constraints as single lines
        
         # Get points so we can grab their position and also calculate the distance between them
         point0: PointMass = e.points[c.index0]
@@ -135,7 +145,8 @@ def drawEngine(e: Engine, window):
             
             # Draw a line from point0 to point1, colored according to how far away from neutral they are
             pg.draw.aaline(window, (50, 50, int(255 * colorScale)), point0.position, point1.position)
-    for c in e.outerConstraints: # Draw the outer constraints as a set of two lines
+
+    for c in e.outerConstraints: # Loop to draw the outer constraints as a set of two lines
         
         # Get points so we can grab their position and also calculate the distance between them
         point0: PointMass = e.points[c.index0]
@@ -154,10 +165,9 @@ def drawEngine(e: Engine, window):
         pg.draw.aaline(window, (0,0,0), point0L, point1R)
         pg.draw.aaline(window, (0,0,0), point0R, point1L)
 
-
-    for p in e.points:
+    for p in e.points: # Loop to draw each point
         print(str(p) + " @ " + str(p.position))
-        pg.draw.circle(window, (0, 0, 0), p.position, p.radius, 2)
+        pg.draw.circle(window, (0, 0, 0), p.position, p.radius)
 
 if __name__ == "__main__":
     main()
