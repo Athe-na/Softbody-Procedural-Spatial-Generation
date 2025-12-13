@@ -3,6 +3,22 @@
 import math
 import pygame as pg
 
+class Resolution:
+    def __init__(self, pos: pg.Vector2, vel: pg.Vector2, accel: pg.Vector2) -> None:
+        self.position = pos
+        self.velocity = vel
+        self.acceleration = accel
+
+    def __add__(self, value):
+        self.position += value.position
+        self.velocity += value.velocity
+        self.acceleration += value.acceleration
+        return self
+    
+    def __str__(self):
+        return str("@" + str(self.position) + "w/" + str(self.velocity))
+
+
 class PointMass:
     radius = 5
     IDCounter = 0
@@ -10,8 +26,9 @@ class PointMass:
     def __init__(self, position: pg.Vector2, velocity: pg.Vector2, acceleration: pg.Vector2):
         self.position: pg.Vector2 = position
         self.velocity: pg.Vector2 = velocity
-        self.acceleration: pg.Vector2 = acceleration # Not currently using
+        self.acceleration: pg.Vector2 = acceleration # Not currently using. Will eventually shift to exerting all forces as accelerations
         self.id = self.IDCounter
+        self.resolution: Resolution = Resolution(pg.Vector2(0,0), pg.Vector2(0,0), pg.Vector2(0,0))
         print("Created PointMass with id " + str(self.IDCounter))
         PointMass.IDCounter += 1
     
@@ -22,6 +39,24 @@ class PointMass:
         if self.__str__ == object.__str__:
             return True
         return False
+    
+    def clearResolution(self):
+        self.resolution = Resolution(pg.Vector2(0,0), pg.Vector2(0,0), pg.Vector2(0,0))
+
+    def amendResolution(self, resolution: Resolution):
+        '''
+        Performs the add operation on the current and provided resolution in place
+        '''
+        self.resolution += resolution
+
+    def applyResolution(self):
+        '''
+        Applies the current resolution in place, then clears the resolution
+        '''
+        self.position += self.resolution.position
+        self.velocity += self.resolution.velocity
+        self.acceleration += self.resolution.acceleration
+        self.clearResolution()
 
 def cross(a: pg.Vector2, b: pg.Vector2):
     return a.x * b.y - a.y * b.x
@@ -61,11 +96,11 @@ class Collision:
 class Constraint:
     
     def __init__(self, index0: int, index1: int, distance: float, hard:bool =False, springConst: float=5):
-        self.index0 = index0
-        self.index1 = index1
-        self.distance = distance
-        self.hard = hard # If it's a hard constraint, the two points must be *within* the specified distance of each other.
-        self.springConst = springConst
+        self.index0: int = index0
+        self.index1: int = index1
+        self.distance: float = distance
+        self.hard: bool = hard # If it's a hard constraint, the two points must be *within* the specified distance of each other.
+        self.springConst: float = springConst
 
     def __str__(self):
         return "point" + str(self.index0) + "!point" + str(self.index1) + " < " + str(self.distance) + ":" + str(self.hard)
@@ -209,29 +244,6 @@ class SoftBody: # Possibly obsolete
         print("Created circle")
         return self
 '''
-
-class Resolution:
-    def __init__(self, id: int, pos: pg.Vector2, vel: pg.Vector2, accel: pg.Vector2) -> None:
-        self.pointID = id
-        self.position = pos
-        self.velocity = vel
-        self.acceleration = accel
-
-    def __eq__(self, value) -> bool: # As long as we never make cross type comparisons, this should act correctly.
-        if value == None:
-            return False
-        if str(self.pointID) == str(value.pointID):
-            return True
-        return False
-    
-    def __str__(self) -> str:
-        return str("Resolution" + str(self.pointID) + "@" + str(self.position) + "w/" + str(self.velocity))
-    
-    def __add__(self, other):
-        if isinstance(other, Resolution):
-            return Resolution(self.pointID, self.position + other.position, self.velocity + other.velocity, self.acceleration + other.acceleration)
-        else:
-            raise TypeError("Unsupported operand type(s) for +")
         
 
 class Engine:
@@ -260,10 +272,7 @@ class Engine:
         Function that simulates one "tick" of physics, where the length of the tick is dictated by the dt variable.
         '''
 
-        # Initialize a resolutions array
-        resolutions: list[Resolution] = []
-
-        #update position as the current position plus the velocity x the change in time
+        #update position as the current position plus the velocity x the change in time.
         for p in self.points:
             p.position += p.velocity * dt
 
@@ -274,15 +283,15 @@ class Engine:
             collisions = self.findCollision(p)
             r = self.resolveCollisions(p, collisions) # Based on that list of collisions, create a resolution for point p
             if r != None: # If there actually is a resulting resolution
-                resolutions = self.addOrAmendResolution(resolutions, r)
+                p.amendResolution(r) # Amend p's current resolution
             
-            
-            resolution = self.resolveEdgeCollisions(p)
-            for i in range(len(resolution)):
-                resolutions = self.addOrAmendResolution(resolutions, resolution[i])
+            resolution = self.checkAndResolveEdgeCollisions(p)
+            if resolution != None: # If there actually is a resolution
+                p.amendResolution(resolution[0]) # Amend the resolution of the current point
 
-        print("res3 collisions " + str(resolutions[3]))
-            
+                # Amend the resolution of the other points
+                self.points[resolution[1][1]].amendResolution(resolution[1][0])
+                self.points[resolution[2][1]].amendResolution(resolution[2][0])
 
         '''
         CONSTRAINT RESOLUTION
@@ -345,11 +354,9 @@ class Engine:
                         sumPos1 += normal * -(depth/2)
                     
 
-                    # Add the calculated sumPos and forces to the resolutions array for the appropriate point
-                    resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index0, sumPos0, -force0, pg.Vector2(0,0)))
-                    resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index1, sumPos1, -force1, pg.Vector2(0,0)))
-
-                    print("res3 hard constraints" + str(resolutions[3]))
+                    # Create Resolutions for both points and amend both points' resolution attributes
+                    self.points[c.index0].amendResolution(Resolution(sumPos0, -force0, pg.Vector2(0,0)))
+                    self.points[c.index1].amendResolution(Resolution(sumPos1, -force1, pg.Vector2(0,0)))
                     
             else: # If the constraint isn't hard, then apply dampened force towards the desired distance according to the spring constant
                 
@@ -381,23 +388,17 @@ class Engine:
                 sumVel1 += relVelocityDelta
 
                 # Add this to the current resolution for that point
-                resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index0, sumPos0, sumVel0, pg.Vector2(0,0)))
-                resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index1, sumPos1, sumVel1, pg.Vector2(0,0)))
-
-                print("res3 soft constraints " + str(resolutions[3]))
+                self.points[c.index0].amendResolution(Resolution(sumPos0, sumVel0, pg.Vector2(0,0)))
+                self.points[c.index1].amendResolution(Resolution(sumPos1, sumVel1, pg.Vector2(0,0)))
         '''
         END CONSTRAINT RESOLUTION
         '''
 
-        for r in range(len(resolutions)): # For each item in the resolutions array, apply the resolution to its designated point
+        for p in self.points: # For each point, apply its resolution
             
-            print("Preresolution: " + str(self.points[resolutions[r].pointID]) + " to " + str(self.points[resolutions[r].pointID].velocity) + "(" + str(round(self.points[resolutions[r].pointID].velocity.magnitude(), 2)) + ")@" + str(self.points[resolutions[r].pointID].position))
-
-            self.points[resolutions[r].pointID].position += resolutions[r].position
-            self.points[resolutions[r].pointID].velocity += resolutions[r].velocity
-            self.points[resolutions[r].pointID].acceleration += resolutions[r].acceleration
-            
-            print("Resolved " + str(self.points[resolutions[r].pointID]) + " to " + str(self.points[resolutions[r].pointID].velocity) + "(" + str(round(self.points[resolutions[r].pointID].velocity.magnitude(), 2)) + ")@" + str(self.points[resolutions[r].pointID].position))
+            print(str(p) + " pre-resolution: " + str(p.resolution))
+            p.applyResolution()
+            print(str(p) + " post-resolution: " + str(p.resolution))
 
     # creates Collisions for particle p with respect to all other particles
     def findCollision(self, p: PointMass) -> list[Collision]:   
@@ -490,10 +491,13 @@ class Engine:
             return None
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
         # and return it to the upper layer for eventual execution
-        return Resolution(p.id, sumPos, sumVel, sumAccel)
+        return Resolution(sumPos, sumVel, sumAccel)
     
-    def resolveEdgeCollisions(self, p: PointMass) -> tuple[Resolution, Resolution, Resolution]:
-        
+    def checkAndResolveEdgeCollisions(self, p: PointMass) -> tuple[Resolution, tuple[Resolution, int], tuple[Resolution, int]] | None:
+        '''
+        Function that checks if the provided PointMass is colliding with any outerConstraints. If so, calculate and provide resolutions for all involved points, and indicate which points are involved.
+        '''
+
         # Create variables to store changes for the point
         sumPos = pg.Vector2(0, 0)
         sumVel = pg.Vector2(0, 0)
@@ -502,8 +506,10 @@ class Engine:
         sumVel0 = pg.Vector2(0, 0)
         sumVel1 = pg.Vector2(0, 0)
 
-        # NOTE: Can cull duplicate/triplicate collisions by removing from consideration edges which are connected to points that have been collided with
+        
+        noCollisions = True # Set a noCollisions flag so we can return a None if it is never flipped
 
+        # NOTE: Can cull duplicate/triplicate collisions by removing from consideration edges which are connected to points that have been collided with
         # Find PointMass to Edge collisions among eligible edges (all edges minus any connected to p, and any connected to a point p has collided with this frame)
         for c in self.outerConstraints: # Each constraint acts as an edge, so we iterate through edges to check for collision
 
@@ -534,7 +540,7 @@ class Engine:
 
                 # Check the distance between the relocated point and its projection. If it's less than radius*1.6, then collision.
                 if depth > 0: # Resolve collision
-
+                    noCollisions = False
                     # Need to remember that in this case, the projected point has momentum proportional to how close it is to the center of mass
                     momentumMult = (1+(1-2*abs(0.5-slider)))
 
@@ -590,19 +596,9 @@ class Engine:
 
                     print("Adding to point1 " + str(sumVel1))
         
+        if noCollisions:
+            return None
+
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
         # and return it to the upper layer for eventual execution
-        return (Resolution(p.id, sumPos, sumVel, sumAccel), Resolution(c.index0, pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)), Resolution(c.index1, pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)))
-
-    def addOrAmendResolution(self, resolutions: list[Resolution], toAdd: Resolution) -> list[Resolution]:
-        for r in resolutions:
-            if r == toAdd:
-                print("For " + str(r) + " Amend " + str(r.velocity) + " to " + str(r + toAdd))
-                r += toAdd
-                
-                return resolutions
-        
-        resolutions.append(toAdd)
-        print("Add")
-        return resolutions
-
+        return (Resolution(sumPos, sumVel, sumAccel), (Resolution(pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)),c.index0), (Resolution(pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)), c.index1))
