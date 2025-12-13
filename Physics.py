@@ -222,7 +222,7 @@ class Engine:
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
 
-        self.points.append(PointMass(pg.Vector2(175, 100), pg.Vector2(-200, 0), pg.Vector2(0, 0)))
+        self.points.append(PointMass(pg.Vector2(175, 120), pg.Vector2(-200, 0), pg.Vector2(0, 0)))
 
     def update(self, dt):
         '''
@@ -238,10 +238,14 @@ class Engine:
 
         # Check for the various types of forces and other things we need to apply to each point
         for p in self.points:
+
             # Check for point2point, bounding, and edge collisions and append to resolution list
             resolution = self.resolveCollisions(p)
+            if resolution != None: # If there is a collision with another point
+                resolutions.append(resolution)
+            resolution = self.resolveEdgeCollisions(p)
             if resolution != None:
-                resolutions.append(self.resolveCollisions(p))
+                resolutions.extend(resolution)
 
         '''
         CONSTRAINT RESOLUTION
@@ -387,26 +391,6 @@ class Engine:
             depth: float = p.radius + q.radius - distance
             Collisions.append(Collision(normal, depth, p.velocity, q.velocity, False))
 
-        # Find PointMass to Edge collisions
-        for c in self.outerConstraints: # each constraint acts as an edge, so we iterate through edges to check for collision
-            # Can do this by projecting the point onto the edge and determining the point's distance from that projection
-
-            # Surf is a vector which has the length and angle of the constraint, but casts out from the origin.
-            surf: pg.Vector2 = self.points[c.index1].position - self.points[c.index0].position
-            # relocate is the point in question, but which exists relative to the origin in the same way it exists relative to the point at the beginning of the constraint
-            relocate: pg.Vector2 = p.position - self.points[c.index0].position
-            # proj is the relocated point projected onto the surface
-            proj: pg.Vector2 = relocate.project(surf)
-
-            # Thus, if the relocated point would project onto the length of the surface, it exists at the angle of the constraint's normal to SOME point on the constraint
-            if proj.magnitude() < surf.magnitude() and (proj + surf).magnitude() > surf.magnitude(): # If the projection would fall on the edge
-                
-                # Check the distance between the relocated point and its projection. If it's less than radius*2, then collision.
-                if (relocate - relocate.project(surf)).length() < p.radius*2:
-                    self.resolveEdgeCollision(p, c, surf, relocate)
-
-                # NOTE: Need to add duplication culling for colliding with an edge AND its point
-    
         return Collisions
 
     # Resolves Collisions for particle p with respect to all other particles
@@ -465,9 +449,101 @@ class Engine:
         # and return it to the upper layer for eventual execution
         return Resolution(p.id, sumPos, sumVel, sumAccel)
     
-    def resolveEdgeCollision(self, p: PointMass, c: Constraint, surf: pg.Vector2, relocate: pg.Vector2):
-        pass
+    def resolveEdgeCollisions(self, p: PointMass) -> tuple[Resolution, Resolution, Resolution]:
+        
+        # Create variables to store changes for the point
+        sumPos = pg.Vector2(0, 0)
+        sumVel = pg.Vector2(0, 0)
+        sumAccel = pg.Vector2(0, 0)
 
-    # Check for point to edge collision
-   
-    
+        sumVel0 = pg.Vector2(0, 0)
+        sumVel1 = pg.Vector2(0, 0)
+
+        # NOTE: Can cull duplicate/triplicate collisions by removing from consideration edges which are connected to points that have been collided with
+
+        # Find PointMass to Edge collisions among eligible edges (all edges minus any connected to p, and any connected to a point p has collided with this frame)
+        for c in self.outerConstraints: # Each constraint acts as an edge, so we iterate through edges to check for collision
+
+            # Do not perform for constraints connected to current pointmass
+            if p.id == c.index0 or p.id == c.index1:
+                continue
+
+            # Can do this by projecting the point onto the edge and determining the point's distance from that projection
+
+            # Surf is a vector which has the length and angle of the constraint, but casts out from the origin.
+            surf: pg.Vector2 = self.points[c.index1].position - self.points[c.index0].position
+            # relocate is the point in question, but which exists relative to the origin in the same way it exists relative to the point at the beginning of the constraint
+            relocate: pg.Vector2 = p.position - self.points[c.index0].position
+            # proj is the relocated point projected onto the vector of the surface
+            proj: pg.Vector2 = relocate.project(surf)
+
+            # Thus, if the relocated point would project onto the length of the surface, it exists at the angle of the constraint's normal to SOME point on the constraint
+            if proj.magnitude() < surf.magnitude() and (proj + surf).magnitude() > surf.magnitude(): # If the projection would fall on the edge
+                
+                delta: pg.Vector2 = relocate - proj
+                distance: float = delta.length()
+                normal: pg.Vector2 = delta/distance
+                depth: float = p.radius + p.radius*0.7 - distance
+                slider: float = proj.magnitude() / surf.magnitude() # this is how proportionally close the projection and point of contact is to point1 from point0
+                
+                # This is probably mathematically incorrect, but we might calculate the projection's velocity as the sum of the endpoint velocities proportional to the slider
+                projVel: pg.Vector2 = (self.points[c.index0].velocity * (1-slider)) + (self.points[c.index1].velocity * slider)
+
+                # Check the distance between the relocated point and its projection. If it's less than radius*1.6, then collision.
+                if depth > 0: # Resolve collision
+
+                    # Need to remember that in this case, the projected point has momentum proportional to how close it is to the center of mass
+                    momentumMult = (1+(1-2*abs(0.5-slider)))
+
+                    # COLLISION RESOLUTION FOR INDEPENDENT POINT
+                
+                    # Remove point completely along the normal
+                    sumPos += normal * depth
+                    print(str(p) + " in static collision " + str(c) + ", removed @" + str(sumPos))
+
+                    # NOTE: Want to revisit this to work in proportional removal.
+                
+                    # Compute relative momentum (and split it into tangential and normal)
+                    relMomentum = p.velocity - momentumMult * projVel
+                    relMomentumN = relMomentum.project(normal)
+                    relMomentumT = relMomentum - relMomentumN
+
+                    # Next, update velocity after the collision by computing forces on p
+                    # Elastic force (normal)
+                    impulse: pg.Vector2 = relMomentumN * self.elasticity
+
+                    # Inelastic force (normal)
+                    impulse += relMomentumN*2/3 * (1-self.elasticity)
+
+                    # Tangential force (friction)
+                    impulse += relMomentumT*2/3 * self.friction
+
+                    sumVel -= impulse
+
+                    print("Adding to " + str(p) + str(sumVel))
+                    
+                    # COLLISION RESOLUTION FOR POINTS ON CONSTRAINT
+
+                    # Angular momentum is given L = rmv_N. Thus, the angular momentum on a point at r_0 given a collision at r_1 is
+                    # L = r_1mv_N = r_0mv. Mass doesn't change, so the resulting v is equal to r_1/r_0mv_N = r_1/r_0*P_N
+                    # We'll use the other point as the pivot/frame of reference.
+                    # Resolution for point 0
+                    # Elastic force (normal)
+                    sumVel0: pg.Vector2 = (1-slider) * relMomentumN * self.elasticity
+                    # Inelastic force (normal)
+                    sumVel0 += relMomentumN/3 * (1-self.elasticity)
+                    # Tangential force (friction)
+                    sumVel0 += relMomentumT/3 * self.friction
+
+                    # Resolution for point 1
+                    # Elastic force (normal)
+                    sumVel1: pg.Vector2 = slider * relMomentumN * self.elasticity
+                    # Inelastic force (normal)
+                    sumVel1 += relMomentum/3 * (1-self.elasticity)
+                    # Tangential force (friction)
+                    sumVel1 += relMomentumT/3 * self.friction
+        
+        # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
+        # and return it to the upper layer for eventual execution
+        return (Resolution(p.id, sumPos, sumVel, sumAccel), Resolution(c.index0, pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)), Resolution(c.index1, pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)))
+  

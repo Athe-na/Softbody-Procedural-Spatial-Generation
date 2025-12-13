@@ -25,7 +25,7 @@ def main():
         
     # Create a list of SoftBodies
     softBodies: list[SoftBody] = [SoftBody().dottedRect(50, 50, pg.Vector2(100,100)),
-                                  SoftBody().dot(pg.Vector2(200, 100))]
+                                  SoftBody().dot(pg.Vector2(200, 110))]
 
     # Based on the verticies in those soft bodies, create PointMasses
 
@@ -63,6 +63,14 @@ def main():
                 if event.type == pg.KEYDOWN:
                     if event.key == pg.K_SPACE:
                         firstFramePause = False
+                        dt = 60/1000
+                    if event.key == pg.K_s:
+                        print("Stepping forward")
+                        e.update(dt)
+                        window.fill((255, 255, 255))
+                        drawEngine(e, window)
+                        pg.display.update()            
+                        dt = 60/1000
                 
 
     #Run the sim loop
@@ -98,10 +106,6 @@ def main():
         pg.display.update()            
         dt = clock.tick(60)/1000
 
-def addPointMassesFromSoftBodies(bodies: list[SoftBody]) -> list[PointMass]:
-
-    return []
-
         
 def drawEngine(e: Engine, window):
     for c in e.innerConstraints: # draw inner constraints as single lines
@@ -136,7 +140,7 @@ def drawEngine(e: Engine, window):
         point1: PointMass = e.points[c.index1]
 
         offset: pg.Vector2 = (point1.position - point0.position).rotate(90) # Grab the delta between them rotate that delta 90 degrees to get the offset vector
-        offset.scale_to_length(point0.radius * 0.9) # Scale the offset to nearly the radius length
+        offset.scale_to_length(point0.radius * 0.7) # Scale the offset to nearly the radius length
 
         # Create the four points based on the position +/- the offset
         point0L: pg.Vector2 = point0.position + offset
