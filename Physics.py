@@ -180,11 +180,17 @@ class SoftBody:
     
 
     def scaleShapeMult(self, delta: float):
+        '''
+        Multiplicatively scale the distance attribute in all constraints by the provided factor
+        '''
         for c in self.outerConstraints + self.innerConstraints:
             c.distance *= delta
         return self
     
     def scaleShapeAdd(self, delta: float): # Probably never going to use this lol but could be funny
+        '''
+        Additively scale the distance attribut4e in all constraints by the provided factor
+        '''
         for c in self.outerConstraints + self.innerConstraints:
             c.distance += delta
         return self
@@ -265,7 +271,7 @@ class Engine:
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
 
-        self.points.append(PointMass(pg.Vector2(175, 100), pg.Vector2(-150, 0), pg.Vector2(0, 0)))
+        self.points.append(PointMass(pg.Vector2(175, 100), pg.Vector2(-200, 0), pg.Vector2(0, 0)))
 
     def update(self, dt):
         '''
@@ -275,6 +281,8 @@ class Engine:
         #update position as the current position plus the velocity x the change in time.
         for p in self.points:
             p.position += p.velocity * dt
+
+        # NOTE: I think during the expansion step this won't work. This may require more exhaustive collision detection/resolution
 
         # Check for the various types of forces and other things we need to apply to each point
         for p in self.points:
@@ -602,3 +610,10 @@ class Engine:
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
         # and return it to the upper layer for eventual execution
         return (Resolution(sumPos, sumVel, sumAccel), (Resolution(pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)),c.index0), (Resolution(pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)), c.index1))
+
+    def expand(self, x: float):
+        '''
+        Function which calls scaleShapeMult on every softBody with the provided x value.
+        '''
+        for b in self.softBodies:
+            b.scaleShapeMult(x)

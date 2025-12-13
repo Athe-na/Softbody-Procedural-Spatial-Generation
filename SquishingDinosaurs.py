@@ -35,9 +35,10 @@ def main():
         
     # Create a list of SoftBodies
     softBodies: list[SoftBody] = [
-                                #SoftBody().dottedRect(50, 50, pg.Vector2(100,100)),
-                                  SoftBody().dot(pg.Vector2(200, 110)),
-                                  SoftBody().line(pg.Vector2(100, 100), pg.Vector2(100, 150))]
+                                  SoftBody().dottedRect(50, 50, pg.Vector2(100,100)),
+                                  #SoftBody().dot(pg.Vector2(200, 110)),
+                                  SoftBody().dottedRect(50, 50, pg.Vector2(800, 840))
+                                  ]
 
     # Provide initial walls (NOT CURRENTLY IN USE)
     walls: list[Wall] = [Wall(pg.Vector2(0,0), pg.Vector2(100,0), 5)]
@@ -52,6 +53,7 @@ def main():
     clock = pg.time.Clock()
     running = True
     dt = 0
+    elapsed = 0
 
     # By default, do not pause the program on the first frame.
     firstFramePause = False
@@ -77,7 +79,9 @@ def main():
                         dt = 60/1000
                     if event.key == pg.K_s:
                         print("Stepping forward")
+
                         e.update(dt)
+                        elapsed += dt
                         window.fill((255, 255, 255))
                         drawEngine(e, window)
                         pg.display.update()            
@@ -91,7 +95,7 @@ def main():
             if event.type == pg.QUIT:
                 running = False
             if event.type == pg.KEYDOWN:
-                if event.key == pg.K_SPACE: #if space is pressed, pause
+                if event.key == pg.K_SPACE: # If space is pressed, pause
                     paused = True
                     while paused:
                         for event in pg.event.get():
@@ -99,26 +103,36 @@ def main():
                                 paused = False
                                 running = False
                             if event.type == pg.KEYDOWN:
-                                if event.key == pg.K_SPACE: # if space is pressed again, unpause
+                                if event.key == pg.K_SPACE: # If space is pressed again, unpause
                                     clock.tick(60)
                                     paused = False
                                     dt = 60/1000
-                                if event.key == pg.K_s: #if s is pressed, step forward a frame
+                                if event.key == pg.K_s: # If s is pressed, step forward a frame
                                     print("Stepping forward")
                                     e.update(dt)
                                     window.fill((255, 255, 255))
                                     drawEngine(e, window)
                                     pg.display.update()            
                                     dt = 60/1000
-
+        
+        print("scale: " + str(scaleFunc(elapsed)))
+        e.expand(scaleFunc(elapsed))
         e.update(dt)
+        elapsed += dt
         window.fill((255, 255, 255))
         drawEngine(e, window)
         pg.display.update()            
         dt = clock.tick(60)/1000
 
     print("Sim ended.")
-        
+
+def scaleFunc(elapsed):
+    if elapsed <= 10:
+        print("scaling by " + str(1 + math.sqrt(0.000001 * elapsed)))
+        return (1 + math.sqrt(0.000005* elapsed))
+    return 1
+
+
 def drawEngine(e: Engine, window):
     for c in e.innerConstraints: # Loop to draw inner constraints as single lines
        
