@@ -203,6 +203,21 @@ class Resolution:
         self.velocity = vel
         self.acceleration = accel
 
+    def __eq__(self, value: object) -> bool: # As long as we never make cross type comparisons, this should act correctly.
+        if str(self.pointID) == str(object).split(',')[0]:
+            return True
+        return False
+    
+    def __str__(self) -> str:
+        return str(str(self.pointID) + str(self.position) + str(self.velocity) + str(self.acceleration))
+    
+    def __add__(self, other):
+        if isinstance(other, Resolution):
+            return Resolution(self.pointID, self.position + other.position, self.velocity + other.velocity, self.acceleration + other.acceleration)
+        else:
+            raise TypeError("Unsupported operand type(s) for +")
+        
+
 class Engine:
     
     def __init__(self, softBodies: list[SoftBody], walls: list[Wall], elasticity: float, friction: float, springDamping: float, WIDTH: int, HEIGHT: int):
@@ -222,7 +237,7 @@ class Engine:
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
 
-        self.points.append(PointMass(pg.Vector2(175, 120), pg.Vector2(-200, 0), pg.Vector2(0, 0)))
+        self.points.append(PointMass(pg.Vector2(175, 110), pg.Vector2(-150, 0), pg.Vector2(0, 0)))
 
     def update(self, dt):
         '''
@@ -239,13 +254,18 @@ class Engine:
         # Check for the various types of forces and other things we need to apply to each point
         for p in self.points:
 
-            # Check for point2point, bounding, and edge collisions and append to resolution list
-            resolution = self.resolveCollisions(p)
-            if resolution != None: # If there is a collision with another point
-                resolutions.append(resolution)
+            # Create a list of point2point collisions for point p
+            collisions = self.findCollision(p)
+            r = self.resolveCollisions(p, collisions) # Based on that list of collisions, create a resolution for point p
+            if r != None: # If there actually is a resulting resolution
+                resolutions = self.addOrAmendResolution(resolutions, r)
+            
+            
             resolution = self.resolveEdgeCollisions(p)
-            if resolution != None:
-                resolutions.extend(resolution)
+
+            for i in range(len(resolution)):
+                self.addOrAmendResolution(resolutions, resolution[i])
+            
 
         '''
         CONSTRAINT RESOLUTION
@@ -394,20 +414,20 @@ class Engine:
         return Collisions
 
     # Resolves Collisions for particle p with respect to all other particles
-    def resolveCollisions(self, p: PointMass) -> Resolution:
-        #create a prev variable to store the previous position so we can calculate change in velocity
-        prev = p.position
-        #create a list of point collisions
-        collisions: list[Collision] = self.findCollision(p)
+    def resolveCollisions(self, p: PointMass, collisions: list[Collision]) -> Resolution | None:
 
         #if there are multiple collisions, we want to be able to sum the position and velocity effects
         sumPos = pg.Vector2(0, 0)
         sumVel = pg.Vector2(0, 0)
         sumAccel = pg.Vector2(0, 0)
 
+        noCollisions: bool = True # If true, return a NoneType
         #for each collision
         for c in collisions:
+
             if c.depth > 0: #check if the depth is positive (if the objects are inside each other)
+                noCollisions = False # Set the noCollisions flag to false, so we will return a Resolution object.
+                
                 # Debug: print out collision details
                 print(str(p) + "collision: " + str(c))
                 if c.v2 == pg.Vector2(0, 0): # If the other object isn't moving, remove along the normal but completely.
@@ -442,9 +462,8 @@ class Engine:
 
                 print("Adding to " + str(p) + str(sumVel))
             
-                
-            else:
-                pass
+        if noCollisions:
+            return None
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
         # and return it to the upper layer for eventual execution
         return Resolution(p.id, sumPos, sumVel, sumAccel)
@@ -464,7 +483,7 @@ class Engine:
         # Find PointMass to Edge collisions among eligible edges (all edges minus any connected to p, and any connected to a point p has collided with this frame)
         for c in self.outerConstraints: # Each constraint acts as an edge, so we iterate through edges to check for collision
 
-            # Do not perform for constraints connected to current pointmass
+            # Do not perform for constraints connected to current PointMass
             if p.id == c.index0 or p.id == c.index1:
                 continue
 
@@ -546,4 +565,12 @@ class Engine:
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
         # and return it to the upper layer for eventual execution
         return (Resolution(p.id, sumPos, sumVel, sumAccel), Resolution(c.index0, pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)), Resolution(c.index1, pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)))
-  
+
+    def addOrAmendResolution(self, resolutions: list[Resolution], toAdd: Resolution) -> list[Resolution]:
+        for r in resolutions:
+            if r == toAdd:
+                r += toAdd
+                return resolutions
+        resolutions.append(toAdd)
+        return resolutions
+
