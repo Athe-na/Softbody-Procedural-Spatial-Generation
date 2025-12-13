@@ -92,6 +92,20 @@ class SoftBody:
 
         return self
 
+    def line(self, pos0: pg.Vector2, pos1: pg.Vector2):
+        '''
+        Creates a body consisting of two PointMasses connected by an outer constraint
+        '''
+        # Create points
+        point0 = self.addPointAtPos(pos0)
+        point1 = self.addPointAtPos(pos1)
+
+        # Add constraint
+        self.outerConstraints.append(Constraint(point0, point1, (pos0 - pos1).length()))
+
+        return self
+
+
     def dottedRect(self, width: float, height: float, pos: pg.Vector2):
         '''
         Creates a rectangular arrangement of interconnected PointMasses with a PointMass in the middle
@@ -203,13 +217,13 @@ class Resolution:
         self.velocity = vel
         self.acceleration = accel
 
-    def __eq__(self, value: object) -> bool: # As long as we never make cross type comparisons, this should act correctly.
-        if str(self.pointID) == str(object).split(',')[0]:
+    def __eq__(self, value) -> bool: # As long as we never make cross type comparisons, this should act correctly.
+        if str(self.pointID) == str(value.pointID):
             return True
         return False
     
     def __str__(self) -> str:
-        return str(str(self.pointID) + str(self.position) + str(self.velocity) + str(self.acceleration))
+        return str("Resolution" + str(self.pointID) + "@" + str(self.position) + "w/" + str(self.velocity))
     
     def __add__(self, other):
         if isinstance(other, Resolution):
@@ -262,9 +276,11 @@ class Engine:
             
             
             resolution = self.resolveEdgeCollisions(p)
-
             for i in range(len(resolution)):
-                self.addOrAmendResolution(resolutions, resolution[i])
+                resolutions = self.addOrAmendResolution(resolutions, resolution[i])
+            print(str(resolutions))
+
+        print("res3 " + str(resolutions[3]))
             
 
         '''
@@ -329,8 +345,10 @@ class Engine:
                     
 
                     # Add the calculated sumPos and forces to the resolutions array for the appropriate point
-                    resolutions.append(Resolution(c.index0, sumPos0, -force0, pg.Vector2(0,0)))
-                    resolutions.append(Resolution(c.index1, sumPos1, -force1, pg.Vector2(0,0)))
+                    resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index0, sumPos0, -force0, pg.Vector2(0,0)))
+                    resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index1, sumPos1, -force1, pg.Vector2(0,0)))
+
+                    print("res3 " + str(resolutions[3]))
                     
             else: # If the constraint isn't hard, then apply dampened force towards the desired distance according to the spring constant
                 
@@ -362,8 +380,10 @@ class Engine:
                 sumVel1 += relVelocityDelta
 
                 # Add this to the current resolution for that point
-                resolutions.append(Resolution(c.index0, sumPos0, sumVel0, pg.Vector2(0,0)))
-                resolutions.append(Resolution(c.index1, sumPos1, sumVel1, pg.Vector2(0,0)))
+                resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index0, sumPos0, sumVel0, pg.Vector2(0,0)))
+                resolutions = self.addOrAmendResolution(resolutions, Resolution(c.index1, sumPos1, sumVel1, pg.Vector2(0,0)))
+
+                print("res3 " + str(resolutions[3]))
         '''
         END CONSTRAINT RESOLUTION
         '''
@@ -569,8 +589,13 @@ class Engine:
     def addOrAmendResolution(self, resolutions: list[Resolution], toAdd: Resolution) -> list[Resolution]:
         for r in resolutions:
             if r == toAdd:
+                print("Amend " + str(r.velocity) + " to " + str(r + toAdd))
                 r += toAdd
+                
                 return resolutions
+            print(str(r) + str(toAdd))
+        
         resolutions.append(toAdd)
+        print("Add")
         return resolutions
 

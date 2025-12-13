@@ -24,8 +24,10 @@ def main():
     window.fill((255,255,255))
         
     # Create a list of SoftBodies
-    softBodies: list[SoftBody] = [SoftBody().dottedRect(50, 50, pg.Vector2(100,100)),
-                                  SoftBody().dot(pg.Vector2(200, 110))]
+    softBodies: list[SoftBody] = [
+                                #SoftBody().dottedRect(50, 50, pg.Vector2(100,100)),
+                                  SoftBody().dot(pg.Vector2(200, 110)),
+                                  SoftBody().line(pg.Vector2(100, 100), pg.Vector2(100, 150))]
 
     # Based on the verticies in those soft bodies, create PointMasses
 
