@@ -36,8 +36,7 @@ def main():
     # Create a list of SoftBodies
     softBodies: list[SoftBody] = [
                                   SoftBody().dottedRect(50, 50, pg.Vector2(100,100)),
-                                  #SoftBody().dot(pg.Vector2(200, 110)),
-                                  SoftBody().dottedRect(50, 50, pg.Vector2(800, 840))
+                                  SoftBody().dottedRect(50, 50, pg.Vector2(800, 840)),
                                   ]
 
     # Provide initial walls (NOT CURRENTLY IN USE)
@@ -53,7 +52,7 @@ def main():
     clock = pg.time.Clock()
     running = True
     dt = 0
-    elapsed = 0
+    elapsedFrames = 0
 
     # By default, do not pause the program on the first frame.
     firstFramePause = False
@@ -81,7 +80,7 @@ def main():
                         print("Stepping forward")
 
                         e.update(dt)
-                        elapsed += dt
+                        elapsedFrames += 1
                         window.fill((255, 255, 255))
                         drawEngine(e, window)
                         pg.display.update()            
@@ -115,10 +114,8 @@ def main():
                                     pg.display.update()            
                                     dt = 60/1000
         
-        print("scale: " + str(scaleFunc(elapsed)))
-        e.expand(scaleFunc(elapsed))
         e.update(dt)
-        elapsed += dt
+        elapsedFrames += 1
         window.fill((255, 255, 255))
         drawEngine(e, window)
         pg.display.update()            
@@ -127,9 +124,9 @@ def main():
     print("Sim ended.")
 
 def scaleFunc(elapsed):
-    if elapsed <= 10:
-        print("scaling by " + str(1 + math.sqrt(0.000001 * elapsed)))
-        return (1 + math.sqrt(0.000005* elapsed))
+    if elapsed == 60:
+        print("scaling by " + str(5))
+        return 10
     return 1
 
 

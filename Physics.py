@@ -297,9 +297,9 @@ class Engine:
             if resolution != None: # If there actually is a resolution
                 p.amendResolution(resolution[0]) # Amend the resolution of the current point
 
-                # Amend the resolution of the other points
-                self.points[resolution[1][1]].amendResolution(resolution[1][0])
-                self.points[resolution[2][1]].amendResolution(resolution[2][0])
+                for r in range(len(resolution[1])):
+                    self.points[resolution[1][r][1]].amendResolution(resolution[1][r][0])
+            
 
         '''
         CONSTRAINT RESOLUTION
@@ -501,7 +501,7 @@ class Engine:
         # and return it to the upper layer for eventual execution
         return Resolution(sumPos, sumVel, sumAccel)
     
-    def checkAndResolveEdgeCollisions(self, p: PointMass) -> tuple[Resolution, tuple[Resolution, int], tuple[Resolution, int]] | None:
+    def checkAndResolveEdgeCollisions(self, p: PointMass) -> tuple[Resolution, list[tuple[Resolution, int]]] | None:
         '''
         Function that checks if the provided PointMass is colliding with any outerConstraints. If so, calculate and provide resolutions for all involved points, and indicate which points are involved.
         '''
@@ -516,6 +516,7 @@ class Engine:
 
         
         noCollisions = True # Set a noCollisions flag so we can return a None if it is never flipped
+        otherResolutions: list[tuple[Resolution, int]] = []
 
         # NOTE: Can cull duplicate/triplicate collisions by removing from consideration edges which are connected to points that have been collided with
         # Find PointMass to Edge collisions among eligible edges (all edges minus any connected to p, and any connected to a point p has collided with this frame)
@@ -593,6 +594,8 @@ class Engine:
                     sumVel0 += relMomentumT/3 * self.friction
 
                     print("Adding to point0 " + str(sumVel0))
+                    otherResolutions.append((Resolution(pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)), c.index0))
+                    
 
                     # Resolution for point 1
                     # Elastic force (normal)
@@ -603,13 +606,16 @@ class Engine:
                     sumVel1 += relMomentumT/3 * self.friction
 
                     print("Adding to point1 " + str(sumVel1))
+                    print("index1?" + str(c.index1))
+                    otherResolutions.append((Resolution(pg.Vector2(0,0), sumVel1, pg.Vector2(0,0)), c.index1))
+
         
         if noCollisions:
             return None
 
         # Once we've gathered the sum of the effects of all collisions, bundle them as a resolution object
         # and return it to the upper layer for eventual execution
-        return (Resolution(sumPos, sumVel, sumAccel), (Resolution(pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)),c.index0), (Resolution(pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)), c.index1))
+        return (Resolution(sumPos, sumVel, sumAccel), otherResolutions)
 
     def expand(self, x: float):
         '''
