@@ -3,6 +3,8 @@
 import ctypes
 
 import pygame as pg
+import pygame_widgets as pw
+from pygame_widgets.button import Button
 import io
 import sys
 import math
@@ -48,16 +50,16 @@ def runSim(WIDTH, HEIGHT) -> bool:
     # Create the side panel window
     sidePanel = pg.Surface((400, HEIGHT))
     sidePanel.fill((217, 186, 209))
-    drawSidePanel(sidePanel)
     
-
+    drawSidePanel(sidePanel)
+    buttons = placeSidePanelButtons(window, WIDTH)
     
 
     # Initialize sim clock and other guts of program
     clock = pg.time.Clock()
     running = True
     dt = 0
-    elapsedFrames = 0
+    elapsedFrames = 0 
     reset = False
 
     # Create a list of SoftBodies
@@ -73,9 +75,7 @@ def runSim(WIDTH, HEIGHT) -> bool:
     # Initialize the engine
     e = Engine(softBodies, walls, 0.75, 0.5, 2, WIDTH-400, HEIGHT)
     drawEngine(e, simWindow)
-    pg.display.update()
-
-    
+    pg.display.update()    
 
     # By default, do not pause the program on the first frame.
     firstFramePause = False
@@ -92,28 +92,34 @@ def runSim(WIDTH, HEIGHT) -> bool:
 
         while firstFramePause:
             for event in pg.event.get():
+
                 if event.type == pg.QUIT:
                     firstFramePause = False
                     running = False
+
                 if event.type == pg.KEYDOWN:
                     if event.key == pg.K_SPACE: # This has a known error where dt is calculated as total elapsed time after unpausing from stepping mode
                         firstFramePause = False
                         dt = 60/1000
+
                     if event.key == pg.K_s:
                         print("Stepping forward")
-
                         e.update(dt)
                         elapsedFrames += 1
-                        window.fill((255, 255, 255))
-                        drawEngine(e, simWindow)
-                        pg.display.update()            
+                        
+                        simWindow.fill((255,255,255)) # Fills the sim window to wipe previous frame.
+                        drawEngine(e, simWindow) # Draws the softbodies in the simWindow
+                        drawApp(WIDTH, HEIGHT, window, simWindow, sidePanel) # Combines the simWindow and the sidePanel onto the main window
+                        pg.display.update() # Performs the window update
+            
                         dt = 60/1000
                 
 
     #Run the sim loop
     while running:
         #Event handling
-        for event in pg.event.get():
+        events = pg.event.get()
+        for event in events:
             if event.type == pg.QUIT: # If the event is a quit, stop running the program
                 running = False
             if event.type == pg.KEYDOWN: # If a key is pressed...
@@ -128,6 +134,7 @@ def runSim(WIDTH, HEIGHT) -> bool:
                             if event.type == pg.QUIT:
                                 paused = False
                                 running = False
+                                reset = False
                             if event.type == pg.KEYDOWN:
                                 if event.key == pg.K_SPACE: # If space is pressed again, unpause
                                     clock.tick(60)
@@ -136,10 +143,15 @@ def runSim(WIDTH, HEIGHT) -> bool:
                                 if event.key == pg.K_s: # If s is pressed, step forward a frame
                                     print("Stepping forward")
                                     e.update(dt)
-                                    window.fill((255, 255, 255))
-                                    drawEngine(e, simWindow)
-                                    pg.display.update()            
+
+                                    # Code for drawing the app. Really needs to be cleaned up.
+                                    simWindow.fill((255,255,255)) # Fills the sim window to wipe previous frame.
+                                    drawEngine(e, simWindow) # Draws the softbodies in the simWindow
+                                    drawApp(WIDTH, HEIGHT, window, simWindow, sidePanel) # Combines the simWindow and the sidePanel onto the main window
+                                    pg.display.update() 
+
                                     dt = 60/1000
+
                                 if event.key == pg.K_r: # If r is pressed, reset the sim
                                     reset = True
                                     paused = False
@@ -150,14 +162,16 @@ def runSim(WIDTH, HEIGHT) -> bool:
             break
         e.update(dt)
         elapsedFrames += 1
+        dt = clock.tick(60)/1000
 
         # Code for drawing the app. Really needs to be cleaned up.
         simWindow.fill((255,255,255)) # Fills the sim window to wipe previous frame.
         drawEngine(e, simWindow) # Draws the softbodies in the simWindow
         drawApp(WIDTH, HEIGHT, window, simWindow, sidePanel) # Combines the simWindow and the sidePanel onto the main window
         
+        pw.update(events)
         pg.display.update()            
-        dt = clock.tick(60)/1000
+        
 
     print("Sim ended.")
     return reset
@@ -235,7 +249,13 @@ def drawSidePanel(window: pg.Surface):
     pg.font.init()
     font = pg.font.Font("resources/Exo2-Regular.ttf", 200)
 
-    window.blit(font.render("Hi", True, (0,0,0)), (100,100))
+def placeSidePanelButtons(window: pg.Surface, WIDTH: int):
+    
+    # Place reset button
+    resetButton = Button(window, WIDTH-150, 100, 100, 50, text="Reset", fontsize=50, margin=20,
+                         onClick=pg.event.post(pg.event.Event(pg.KEYDOWN, key=pg.K_a)))
+
+    return resetButton
 
 if __name__ == "__main__":
     main()
