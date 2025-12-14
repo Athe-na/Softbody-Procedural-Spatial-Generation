@@ -29,14 +29,22 @@ def main():
     WIDTH = int(sys.argv[1])
     HEIGHT = int(sys.argv[2])
 
+    reset = True
+
+    while reset:
+
+        reset = runSim(WIDTH, HEIGHT)
+
+def runSim(WIDTH, HEIGHT) -> bool:
+
     # Initialize the window
     window = pg.display.set_mode((WIDTH, HEIGHT))
     window.fill((255,255,255))
-        
+
     # Create a list of SoftBodies
     softBodies: list[SoftBody] = [
-                                  SoftBody().dottedRect(50, 50, pg.Vector2(100,100)),
-                                  SoftBody().dottedRect(50, 50, pg.Vector2(800, 840)),
+                                  SoftBody().dottedRect(100, 100, pg.Vector2(100,100)),
+                                  SoftBody().dottedRect(100, 100, pg.Vector2(800, 840)),
                                   ]
 
     # Provide initial walls (NOT CURRENTLY IN USE)
@@ -53,6 +61,7 @@ def main():
     running = True
     dt = 0
     elapsedFrames = 0
+    reset = False
 
     # By default, do not pause the program on the first frame.
     firstFramePause = False
@@ -96,6 +105,7 @@ def main():
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_SPACE: # If space is pressed, pause
                     paused = True
+                    dt = 60/1000
                     while paused:
                         for event in pg.event.get():
                             if event.type == pg.QUIT:
@@ -113,7 +123,14 @@ def main():
                                     drawEngine(e, window)
                                     pg.display.update()            
                                     dt = 60/1000
-        
+                                if event.key == pg.K_r: # If r is pressed, reset the sim
+                                    reset = True
+                                    paused = False
+                                    running = False
+                                    break
+
+        if reset:
+            break
         e.update(dt)
         elapsedFrames += 1
         window.fill((255, 255, 255))
@@ -122,6 +139,13 @@ def main():
         dt = clock.tick(60)/1000
 
     print("Sim ended.")
+    resetSim()
+    return reset
+
+def resetSim():
+    PointMass.IDCounter = 0
+    Wall.IDCounter = 0
+    SoftBody.IDCounter = 0
 
 def scaleFunc(elapsed):
     if elapsed == 60:

@@ -20,7 +20,7 @@ class Resolution:
 
 
 class PointMass:
-    radius = 5
+    radius = 10
     IDCounter = 0
 
     def __init__(self, position: pg.Vector2, velocity: pg.Vector2, acceleration: pg.Vector2):
@@ -211,46 +211,7 @@ class SoftBody:
         # Add the point to the point list, creating it at the specified spot
         point = PointMass(pos, pg.Vector2(0,0), pg.Vector2(0,0))
         self.points.append(point)
-        return point.id
-        
-class Vertex:
-
-    IDCounter: int = 0
-
-    def __init__(self, position: pg.Vector2, direction: pg.Vector2 = pg.Vector2(0, 0), stiffness: float = 0) -> None:
-        self.position: pg.Vector2 = position
-        self.id = self.IDCounter
-        self.direction = direction # The direction along which it prefers to move along. Useful for hallways primarily I think
-        self.stiffness = stiffness # How much pushes will be redirected along the direction
-        self.IDCounter += 1
-'''
-class SoftBody: # Possibly obsolete
-            
-    def __init__(self) -> None:
-        self.verticies: list[Vertex] # This is the list of unmoving abstract verticies that compose the ideal shape
-        self.scale: float
-        self.indexMin: int
-        self.indexMax: int
-
-    def circle(self, vertexCount: int, radius: int): # Create a circle as specified
-        # Start by doing some basic accounting
-        divisions: float = 360/vertexCount
-        angle: pg.Vector2 = pg.Vector2(1, 0)
-
-        # Then create verticies at the set angle intervals such that we create a circle of verticies at the given radius
-        for v in range(vertexCount):
-            newVert = Vertex(angle * radius)
-            if v == 0: # If the loop index is 0, this will be the min id for verticies for this soft body.
-                self.indexMin = newVert.id
-            if v == vertexCount - 1: # Oppositely, if it's the last index, set it to be the max id for this soft body
-                self.indexMax = newVert.id
-            self.verticies.append(newVert) # Create a point
-            angle.rotate_ip(divisions) # Rotate the angle in place.
-        
-        print("Created circle")
-        return self
-'''
-        
+        return point.id     
 
 class Engine:
     
