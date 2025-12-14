@@ -1,4 +1,6 @@
 # Authored by Athena Osborne
+# Implementation of PointMass, Constraint, Engine, Collision, and collision detection and resolution derived from Nikita Lisitsa's "Making a 2D soft-body physics engine"
+# https://lisyarus.github.io/blog/posts/soft-body-physics.html
 
 import math
 import pygame as pg
@@ -57,9 +59,6 @@ class PointMass:
         self.velocity += self.resolution.velocity
         self.acceleration += self.resolution.acceleration
         self.clearResolution()
-
-def cross(a: pg.Vector2, b: pg.Vector2):
-    return a.x * b.y - a.y * b.x
 
 class Wall:
     IDCounter = 0

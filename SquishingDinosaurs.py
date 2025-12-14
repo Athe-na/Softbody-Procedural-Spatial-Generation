@@ -8,7 +8,7 @@ import sys
 import math
 import random
 from Dinosaur import Dinosaur
-from Physics import Engine, PointMass, Wall, Constraint, SoftBody, cross
+from Physics import Engine, PointMass, Wall, SoftBody
 
 def main():
 
@@ -29,17 +29,36 @@ def main():
     WIDTH = int(sys.argv[1])
     HEIGHT = int(sys.argv[2])
 
-    reset = True
-
-    while reset:
-
+    # Run the sim for the first time, setting the reset flag on its return value 
+    reset = runSim(WIDTH, HEIGHT)
+    while reset: # If the reset flag is on, reset globals for relevant classes and run the sim again.
+        resetSim()
         reset = runSim(WIDTH, HEIGHT)
 
 def runSim(WIDTH, HEIGHT) -> bool:
 
-    # Initialize the window
+    # Initialize the main window
     window = pg.display.set_mode((WIDTH, HEIGHT))
     window.fill((255,255,255))
+
+    # Create the simulation window
+    simWindow = pg.Surface((WIDTH-400, HEIGHT))
+    simWindow.fill((255,255,255))
+
+    # Create the side panel window
+    sidePanel = pg.Surface((400, HEIGHT))
+    sidePanel.fill((217, 186, 209))
+    drawSidePanel(sidePanel)
+    
+
+    
+
+    # Initialize sim clock and other guts of program
+    clock = pg.time.Clock()
+    running = True
+    dt = 0
+    elapsedFrames = 0
+    reset = False
 
     # Create a list of SoftBodies
     softBodies: list[SoftBody] = [
@@ -52,16 +71,11 @@ def runSim(WIDTH, HEIGHT) -> bool:
 
     
     # Initialize the engine
-    e = Engine(softBodies, walls, 0.75, 0.5, 2, WIDTH, HEIGHT)
-    drawEngine(e, window)
+    e = Engine(softBodies, walls, 0.75, 0.5, 2, WIDTH-400, HEIGHT)
+    drawEngine(e, simWindow)
     pg.display.update()
 
-    # Initialize sim clock and other guts of program
-    clock = pg.time.Clock()
-    running = True
-    dt = 0
-    elapsedFrames = 0
-    reset = False
+    
 
     # By default, do not pause the program on the first frame.
     firstFramePause = False
@@ -70,8 +84,8 @@ def runSim(WIDTH, HEIGHT) -> bool:
     if str(sys.argv[3]) == "1":
         print("Paused first frame")
         e.update(dt)
-        window.fill((255, 255, 255))
-        drawEngine(e, window)
+        simWindow.fill((255, 255, 255))
+        drawEngine(e, simWindow)
         pg.display.update()            
         dt = 60/1000
         firstFramePause = True
@@ -91,7 +105,7 @@ def runSim(WIDTH, HEIGHT) -> bool:
                         e.update(dt)
                         elapsedFrames += 1
                         window.fill((255, 255, 255))
-                        drawEngine(e, window)
+                        drawEngine(e, simWindow)
                         pg.display.update()            
                         dt = 60/1000
                 
@@ -100,9 +114,12 @@ def runSim(WIDTH, HEIGHT) -> bool:
     while running:
         #Event handling
         for event in pg.event.get():
-            if event.type == pg.QUIT:
+            if event.type == pg.QUIT: # If the event is a quit, stop running the program
                 running = False
-            if event.type == pg.KEYDOWN:
+            if event.type == pg.KEYDOWN: # If a key is pressed...
+                if event.key == pg.K_r: # If r is pressed, set flags for reset
+                    reset = True
+                    running = False
                 if event.key == pg.K_SPACE: # If space is pressed, pause
                     paused = True
                     dt = 60/1000
@@ -120,7 +137,7 @@ def runSim(WIDTH, HEIGHT) -> bool:
                                     print("Stepping forward")
                                     e.update(dt)
                                     window.fill((255, 255, 255))
-                                    drawEngine(e, window)
+                                    drawEngine(e, simWindow)
                                     pg.display.update()            
                                     dt = 60/1000
                                 if event.key == pg.K_r: # If r is pressed, reset the sim
@@ -133,25 +150,35 @@ def runSim(WIDTH, HEIGHT) -> bool:
             break
         e.update(dt)
         elapsedFrames += 1
-        window.fill((255, 255, 255))
-        drawEngine(e, window)
+
+        # Code for drawing the app. Really needs to be cleaned up.
+        simWindow.fill((255,255,255)) # Fills the sim window to wipe previous frame.
+        drawEngine(e, simWindow) # Draws the softbodies in the simWindow
+        drawApp(WIDTH, HEIGHT, window, simWindow, sidePanel) # Combines the simWindow and the sidePanel onto the main window
+        
         pg.display.update()            
         dt = clock.tick(60)/1000
 
     print("Sim ended.")
-    resetSim()
     return reset
 
 def resetSim():
     PointMass.IDCounter = 0
     Wall.IDCounter = 0
     SoftBody.IDCounter = 0
+    print("Resetting...")
 
 def scaleFunc(elapsed):
     if elapsed == 60:
         print("scaling by " + str(5))
         return 10
     return 1
+
+
+def drawApp(WIDTH, HEIGHT, base: pg.Surface, engineWindow: pg.Surface, sidePanel: pg.Surface):
+    base.fill((255, 255, 255), rect=(0,0,WIDTH-400, HEIGHT))
+    base.blit(engineWindow, (0,0))
+    base.blit(sidePanel, (WIDTH-400, 0))
 
 
 def drawEngine(e: Engine, window):
@@ -203,6 +230,12 @@ def drawEngine(e: Engine, window):
     for p in e.points: # Loop to draw each point
         print(str(p) + " @ " + str(p.position))
         pg.draw.circle(window, (0, 0, 0), p.position, p.radius)
+
+def drawSidePanel(window: pg.Surface):
+    pg.font.init()
+    font = pg.font.Font("resources/Exo2-Regular.ttf", 200)
+
+    window.blit(font.render("Hi", True, (0,0,0)), (100,100))
 
 if __name__ == "__main__":
     main()
