@@ -221,7 +221,6 @@ def getScaleFromTextBox(box: TextBox):
     text = box.getText()
     try:
         num = float(text)
-        print(type(num))
         return num
     except:
         print("Invalid scale provided. Please input a number.")

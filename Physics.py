@@ -31,7 +31,7 @@ class PointMass:
         self.acceleration: pg.Vector2 = acceleration # Not currently using. Will eventually shift to exerting all forces as accelerations
         self.id = self.IDCounter
         self.resolution: Resolution = Resolution(pg.Vector2(0,0), pg.Vector2(0,0), pg.Vector2(0,0))
-        print("Created PointMass with id " + str(self.IDCounter))
+        #print("Created PointMass with id " + str(self.IDCounter))
         PointMass.IDCounter += 1
     
     def __str__(self):
@@ -74,7 +74,7 @@ class Wall:
         self.center = pos0 + (pos1-pos0).normalize() * self.length/2
 
         self.id = self.IDCounter
-        print("Created Wall with id " + str(self.IDCounter))
+        #print("Created Wall with id " + str(self.IDCounter))
         Wall.IDCounter += 1
 
     def __str__(self):
@@ -115,8 +115,8 @@ class SoftBody:
         self.outerConstraints: list[Constraint] = [] # The list of indexes which correspond to outer edges in self.constraints
         self.scale: float = 1
         self.IDCounter += 1
-        print("Initialized softbody " + str(self.id))
-        print("Constraints initialized in SoftBody: " + str(self.innerConstraints + self.outerConstraints))
+        #print("Initialized softbody " + str(self.id))
+        #print("Constraints initialized in SoftBody: " + str(self.innerConstraints + self.outerConstraints))
     
     def dot(self, pos: pg.Vector2):
         '''
@@ -230,8 +230,6 @@ class Engine:
         self.springDamping: float = springDamping
         self.WIDTH: int = WIDTH
         self.HEIGHT: int = HEIGHT
-
-        self.points.append(PointMass(pg.Vector2(175, 100), pg.Vector2(-200, 0), pg.Vector2(0, 0)))
 
     def update(self, dt):
         '''
@@ -364,9 +362,9 @@ class Engine:
 
         for p in self.points: # For each point, apply its resolution
             
-            print(str(p) + " pre-resolution: " + str(p.resolution))
+            #print(str(p) + " pre-resolution: " + str(p.resolution))
             p.applyResolution()
-            print(str(p) + " post-resolution: " + str(p.resolution))
+            #print(str(p) + " post-resolution: " + str(p.resolution))
 
     # creates Collisions for particle p with respect to all other particles
     def findCollision(self, p: PointMass) -> list[Collision]:   
@@ -422,10 +420,10 @@ class Engine:
                 noCollisions = False # Set the noCollisions flag to false, so we will return a Resolution object.
                 
                 # Debug: print out collision details
-                print(str(p) + "collision: " + str(c))
+                #print(str(p) + "collision: " + str(c))
                 if c.v2 == pg.Vector2(0, 0): # If the other object isn't moving, remove along the normal but completely.
                     sumPos += c.normal * c.depth
-                    print(str(p) + " in static collision " + str(c) + ", removed @" + str(sumPos))
+                    #print(str(p) + " in static collision " + str(c) + ", removed @" + str(sumPos))
                 else:
                     # Calculate the proportion of the momentum that p has relative to the normal, and remove it by that amount
                     proportion: float = p.velocity.project(c.normal).length() / (p.velocity.project(c.normal).length() + c.v2.project(c.normal).length())
@@ -453,7 +451,7 @@ class Engine:
 
                 sumVel -= force
 
-                print("Point2Point: Adding to " + str(p) + str(sumVel))
+                #print("Point2Point: Adding to " + str(p) + str(sumVel))
             
         if noCollisions:
             return None
@@ -517,7 +515,7 @@ class Engine:
                 
                     # Remove point completely along the normal
                     sumPos += normal * depth
-                    print(str(p) + " in static collision " + str(c) + ", removed @" + str(sumPos))
+                    #print(str(p) + " in static collision " + str(c) + ", removed @" + str(sumPos))
 
                     # NOTE: Want to revisit this to work in proportional removal.
                 
@@ -538,7 +536,7 @@ class Engine:
 
                     sumVel -= impulse
 
-                    print("Edge: Adding to " + str(p) + str(sumVel))
+                    #print("Edge: Adding to " + str(p) + str(sumVel))
                     
                     # COLLISION RESOLUTION FOR POINTS ON CONSTRAINT
 
@@ -553,7 +551,7 @@ class Engine:
                     # Tangential force (friction)
                     sumVel0 += relMomentumT/3 * self.friction
 
-                    print("Adding to point0 " + str(sumVel0))
+                    #print("Adding to point0 " + str(sumVel0))
                     otherResolutions.append((Resolution(pg.Vector2(0,0), sumVel0, pg.Vector2(0,0)), c.index0))
                     
 
@@ -565,8 +563,8 @@ class Engine:
                     # Tangential force (friction)
                     sumVel1 += relMomentumT/3 * self.friction
 
-                    print("Adding to point1 " + str(sumVel1))
-                    print("index1?" + str(c.index1))
+                    #print("Adding to point1 " + str(sumVel1))
+                    #print("index1?" + str(c.index1))
                     otherResolutions.append((Resolution(pg.Vector2(0,0), sumVel1, pg.Vector2(0,0)), c.index1))
 
         
@@ -577,7 +575,7 @@ class Engine:
         # and return it to the upper layer for eventual execution
         return (Resolution(sumPos, sumVel, sumAccel), otherResolutions)
 
-    def expand(self, x: float):
+    def scaleSoftBodies(self, x: float):
         '''
         Function which calls scaleShapeMult on every softBody with the provided x value.
         '''
