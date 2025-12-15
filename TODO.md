@@ -19,3 +19,5 @@
 - Cull overlapping Point/Edge collisions
 
 - Add more SoftBody types
+
+- Implement config arguments
