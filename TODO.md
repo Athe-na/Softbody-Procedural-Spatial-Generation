@@ -20,4 +20,6 @@
 
     - Implement buttons and text boxes
 
- - Cull overlapping Point/Edge collisions
+- Cull overlapping Point/Edge collisions
+
+- Add more SoftBody types
