@@ -19,3 +19,5 @@
 - Create GUI
 
     - Implement buttons and text boxes
+
+ - Cull overlapping Point/Edge collisions
