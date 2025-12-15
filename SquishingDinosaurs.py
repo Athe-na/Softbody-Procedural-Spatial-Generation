@@ -5,12 +5,18 @@ import ctypes
 import pygame as pg
 import pygame_widgets as pw
 from pygame_widgets.button import Button
+from pygame_widgets.textbox import TextBox
 import io
 import sys
 import math
 import random
 from Dinosaur import Dinosaur
 from Physics import Engine, PointMass, Wall, SoftBody
+
+
+# Initialize global events
+RESET_EVENT = pg.USEREVENT + 1
+SCALE_EVENT = pg.USEREVENT + 2
 
 def main():
 
@@ -26,6 +32,7 @@ def main():
 
     # Initialize pygame
     pg.init()
+    
 
     # Begin by creating gen area (and window size)
     WIDTH = int(sys.argv[1])
@@ -51,9 +58,21 @@ def runSim(WIDTH, HEIGHT) -> bool:
     sidePanel = pg.Surface((400, HEIGHT))
     sidePanel.fill((217, 186, 209))
     
+    # Draw the side panel for the first frame
     drawSidePanel(sidePanel)
-    buttons = placeSidePanelButtons(window, WIDTH)
-    
+
+    # Place textboxes
+    scaleBox = TextBox(window, WIDTH-380, 400, 100, 50, placeholdertext="Scale", fontsize=150) 
+
+    # Place buttons
+    resetButton = Button(window, WIDTH-150, 100, 100, 50, text="Reset", fontsize=100, margin=20,
+                         onClick=lambda: pg.event.post(pg.event.Event(RESET_EVENT)))
+    scaleX2Button = Button(window, WIDTH-150, 200, 100, 50, text="Scale x2", fontsize=100, margin=20,
+                           onClick=lambda: pg.event.post(pg.event.Event(SCALE_EVENT, scale=2)))
+    scaleXHALFButton = Button(window, WIDTH-150, 300, 100, 50, text="Scale x2", fontsize=100, margin=20,
+                           onClick=lambda: pg.event.post(pg.event.Event(SCALE_EVENT, scale=0.5)))
+    scaleXHALFButton = Button(window, WIDTH-150, 400, 100, 50, text="Apply Scale", fontsize=100, margin=20,
+                           onClick=lambda: pg.event.post(pg.event.Event(SCALE_EVENT, scale=getScaleFromTextBox(scaleBox))))
 
     # Initialize sim clock and other guts of program
     clock = pg.time.Clock()
@@ -75,7 +94,7 @@ def runSim(WIDTH, HEIGHT) -> bool:
     # Initialize the engine
     e = Engine(softBodies, walls, 0.75, 0.5, 2, WIDTH-400, HEIGHT)
     drawEngine(e, simWindow)
-    pg.display.update()    
+    pg.display.update()
 
     # By default, do not pause the program on the first frame.
     firstFramePause = False
@@ -86,7 +105,8 @@ def runSim(WIDTH, HEIGHT) -> bool:
         e.update(dt)
         simWindow.fill((255, 255, 255))
         drawEngine(e, simWindow)
-        pg.display.update()            
+        pg.display.update() 
+
         dt = 60/1000
         firstFramePause = True
 
@@ -122,6 +142,16 @@ def runSim(WIDTH, HEIGHT) -> bool:
         for event in events:
             if event.type == pg.QUIT: # If the event is a quit, stop running the program
                 running = False
+            
+            if event.type == RESET_EVENT: # If the event is a custom reset event, set flags for reset
+                reset = True
+                running = False
+                print("RESET_EVENT triggered")
+
+            if event.type == SCALE_EVENT: # If the event is a custom scale event, scale according to the input from the event
+                print(type(event.scale))
+                softBodyScale(e, event.scale)
+
             if event.type == pg.KEYDOWN: # If a key is pressed...
                 if event.key == pg.K_r: # If r is pressed, set flags for reset
                     reset = True
@@ -167,10 +197,15 @@ def runSim(WIDTH, HEIGHT) -> bool:
         # Code for drawing the app. Really needs to be cleaned up.
         simWindow.fill((255,255,255)) # Fills the sim window to wipe previous frame.
         drawEngine(e, simWindow) # Draws the softbodies in the simWindow
-        drawApp(WIDTH, HEIGHT, window, simWindow, sidePanel) # Combines the simWindow and the sidePanel onto the main window
+
+
+        # Whites out the engine canvas and then draws the whole app (engine + panel) onto the window
+        window.fill((255, 255, 255), rect=(0,0,WIDTH-400, HEIGHT))
+        window.blit(simWindow, (0,0))
+        window.blit(sidePanel, (WIDTH-400, 0))
         
         pw.update(events)
-        pg.display.update()            
+        pg.display.update() 
         
 
     print("Sim ended.")
@@ -182,14 +217,21 @@ def resetSim():
     SoftBody.IDCounter = 0
     print("Resetting...")
 
-def scaleFunc(elapsed):
-    if elapsed == 60:
-        print("scaling by " + str(5))
-        return 10
-    return 1
-
+def getScaleFromTextBox(box: TextBox):
+    text = box.getText()
+    try:
+        num = float(text)
+        print(type(num))
+        return num
+    except:
+        print("Invalid scale provided. Please input a number.")
+        return 1
+    
+def softBodyScale(e: Engine, factor: float):
+    e.scaleSoftBodies(factor)
 
 def drawApp(WIDTH, HEIGHT, base: pg.Surface, engineWindow: pg.Surface, sidePanel: pg.Surface):
+    
     base.fill((255, 255, 255), rect=(0,0,WIDTH-400, HEIGHT))
     base.blit(engineWindow, (0,0))
     base.blit(sidePanel, (WIDTH-400, 0))
@@ -209,7 +251,7 @@ def drawEngine(e: Engine, window):
             # 1 is as far apart as possible (RED)
             colorScale = deltaLength/c.distance
             if colorScale > 1: colorScale = 1
-            print(colorScale)
+            #print(colorScale)
             # Draw a line from point0 to point1, colored according to how close they are to violating the constraint
             pg.draw.aaline(window, (int(255*colorScale), int(255*(1-colorScale)), 0), point0.position, point1.position)
         else:
@@ -242,20 +284,13 @@ def drawEngine(e: Engine, window):
         pg.draw.aaline(window, (0,0,0), point0R, point1L)
 
     for p in e.points: # Loop to draw each point
-        print(str(p) + " @ " + str(p.position))
+        #print(str(p) + " @ " + str(p.position))
         pg.draw.circle(window, (0, 0, 0), p.position, p.radius)
 
 def drawSidePanel(window: pg.Surface):
     pg.font.init()
     font = pg.font.Font("resources/Exo2-Regular.ttf", 200)
 
-def placeSidePanelButtons(window: pg.Surface, WIDTH: int):
-    
-    # Place reset button
-    resetButton = Button(window, WIDTH-150, 100, 100, 50, text="Reset", fontsize=50, margin=20,
-                         onClick=pg.event.post(pg.event.Event(pg.KEYDOWN, key=pg.K_a)))
-
-    return resetButton
 
 if __name__ == "__main__":
     main()
