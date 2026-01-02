@@ -9,6 +9,9 @@ To play the simulation, run this command in your terminal from the project folde
 python3 SquishingDinosaurs.py <WindowWidth(px)> <WindowHeight(px)> 0 \<RandomSeed>
 
 Currently supported hotkeys:
+
 Pause Simulation = spacebar
+
 (While paused) step forward one frame = s
+
 Reset Simulation = r
