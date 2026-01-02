@@ -10,7 +10,6 @@ import io
 import sys
 import math
 import random
-from Dinosaur import Dinosaur
 from Physics import Engine, PointMass, Wall, SoftBody
 
 
@@ -65,13 +64,13 @@ def runSim(WIDTH, HEIGHT) -> bool:
     scaleBox = TextBox(window, WIDTH-380, 400, 100, 50, placeholdertext="Scale", fontsize=150) 
 
     # Place buttons
-    resetButton = Button(window, WIDTH-150, 100, 100, 50, text="Reset", fontsize=100, margin=20,
+    resetButton = Button(window, WIDTH-150, 100, 100, 50, text="Reset", fontSize=25, margin=20,
                          onClick=lambda: pg.event.post(pg.event.Event(RESET_EVENT)))
-    scaleX2Button = Button(window, WIDTH-150, 200, 100, 50, text="Scale x2", fontsize=100, margin=20,
+    scaleX2Button = Button(window, WIDTH-150, 200, 100, 50, text="Scale x2", fontSize=25, margin=20,
                            onClick=lambda: pg.event.post(pg.event.Event(SCALE_EVENT, scale=2)))
-    scaleXHALFButton = Button(window, WIDTH-150, 300, 100, 50, text="Scale x2", fontsize=100, margin=20,
+    scaleXHALFButton = Button(window, WIDTH-150, 300, 100, 50, text="Scale x0.5", fontSize=25, margin=20,
                            onClick=lambda: pg.event.post(pg.event.Event(SCALE_EVENT, scale=0.5)))
-    scaleXHALFButton = Button(window, WIDTH-150, 400, 100, 50, text="Apply Scale", fontsize=100, margin=20,
+    scaleButton = Button(window, WIDTH-150, 400, 100, 50, text="Apply Scale", fontSize=25, margin=20,
                            onClick=lambda: pg.event.post(pg.event.Event(SCALE_EVENT, scale=getScaleFromTextBox(scaleBox))))
 
     # Initialize sim clock and other guts of program
@@ -96,6 +95,8 @@ def runSim(WIDTH, HEIGHT) -> bool:
     drawEngine(e, simWindow)
     pg.display.update()
 
+    '''
+    NOT CURRENTLY USING
     # By default, do not pause the program on the first frame.
     firstFramePause = False
 
@@ -133,7 +134,7 @@ def runSim(WIDTH, HEIGHT) -> bool:
                         pg.display.update() # Performs the window update
             
                         dt = 60/1000
-                
+    '''                
 
     #Run the sim loop
     while running:
@@ -190,7 +191,9 @@ def runSim(WIDTH, HEIGHT) -> bool:
 
         if reset:
             break
-        e.update(dt)
+        # Quarter step the update so that it's harder for fast moving things to break
+        for i in range(4):
+            e.update(dt/4)
         elapsedFrames += 1
         dt = clock.tick(60)/1000
 
