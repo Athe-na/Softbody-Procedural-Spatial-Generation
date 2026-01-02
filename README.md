@@ -6,7 +6,7 @@ See TODO.md for a list of planned features and bugfixes.
 
 INSTRUCTIONS FOR USE:
 To play the simulation, run this command in your terminal from the project folder:
-python3 SquishingDinosaurs.py <WindowWidth(px)> <WindowHeight(px)> 0 <RandomSeed>
+python3 SquishingDinosaurs.py <WindowWidth(px)> <WindowHeight(px)> 0 \<RandomSeed>
 
 Currently supported hotkeys:
 Pause Simulation = spacebar
