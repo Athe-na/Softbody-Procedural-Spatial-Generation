@@ -83,7 +83,10 @@ def runSim(WIDTH, HEIGHT) -> bool:
     # Create a list of SoftBodies
     softBodies: list[SoftBody] = [
                                   SoftBody().dottedRect(100, 100, pg.Vector2(100,100)),
-                                  SoftBody().dottedRect(100, 100, pg.Vector2(800, 840)),
+                                  SoftBody().ngon(50, 10, pg.Vector2(1200, 200), centerPoint=False, lattice=2, interiorSpringConst=5),
+                                  SoftBody().edgeSupportedRect(100, 100, pg.Vector2(400, 600), 2, 10),
+                                  SoftBody().edgeSupportedRect(150, 100, pg.Vector2(200, 700), 2, 10),
+                                  SoftBody().edgeSupportedRect(100, 100, pg.Vector2(400, 150), 2)
                                   ]
 
     # Provide initial walls (NOT CURRENTLY IN USE)
@@ -240,50 +243,53 @@ def drawApp(WIDTH, HEIGHT, base: pg.Surface, engineWindow: pg.Surface, sidePanel
 
 
 def drawEngine(e: Engine, window):
-    for c in e.innerConstraints: # Loop to draw inner constraints as single lines
-       
-        # Get points so we can grab their position and also calculate the distance between them
-        point0: PointMass = e.points[c.index0]
-        point1: PointMass = e.points[c.index1]
 
-        if c.hard: # The coloring procedure we want to use for hard constraints
-            deltaLength = (point0.position - point1.position).length()
-            # Use the distance to scale the color of the constraint from 0 to 1: 
-            # 0 is as close together as possible (GREEN) (not possible because they'd be inside each other)
-            # 1 is as far apart as possible (RED)
-            colorScale = deltaLength/c.distance
-            if colorScale > 1: colorScale = 1
-            #print(colorScale)
-            # Draw a line from point0 to point1, colored according to how close they are to violating the constraint
-            pg.draw.aaline(window, (int(255*colorScale), int(255*(1-colorScale)), 0), point0.position, point1.position)
-        else:
-            deltaLength = (point0.position - point1.position).length()
-            # Use the distance to scale the color of the constraint along the parabola.
-            # 2 * c.distance is max, 0 is also max, c.distance is min
-            colorScale = (((deltaLength - c.distance) * (1/c.distance))  ** 2)
-            if colorScale > 1: colorScale = 1 # Cap the value at 1
-            
-            # Draw a line from point0 to point1, colored according to how far away from neutral they are
-            pg.draw.aaline(window, (50, 50, int(255 * colorScale)), point0.position, point1.position)
+    for b in e.softBodies:
 
-    for c in e.outerConstraints: # Loop to draw the outer constraints as a set of two lines
+        for c in b.innerConstraints: # Loop to draw inner constraints as single lines
         
-        # Get points so we can grab their position and also calculate the distance between them
-        point0: PointMass = e.points[c.index0]
-        point1: PointMass = e.points[c.index1]
+            # Get points so we can grab their position and also calculate the distance between them
+            point0: PointMass = e.points[c.index0]
+            point1: PointMass = e.points[c.index1]
 
-        offset: pg.Vector2 = (point1.position - point0.position).rotate(90) # Grab the delta between them rotate that delta 90 degrees to get the offset vector
-        offset.scale_to_length(point0.radius * 0.7) # Scale the offset to nearly the radius length
+            if c.hard: # The coloring procedure we want to use for hard constraints
+                deltaLength = (point0.position - point1.position).length()
+                # Use the distance to scale the color of the constraint from 0 to 1: 
+                # 0 is as close together as possible (GREEN) (not possible because they'd be inside each other)
+                # 1 is as far apart as possible (RED)
+                colorScale = deltaLength/c.distance
+                if colorScale > 1: colorScale = 1
+                #print(colorScale)
+                # Draw a line from point0 to point1, colored according to how close they are to violating the constraint
+                pg.draw.aaline(window, (int(255*colorScale), int(255*(1-colorScale)), 0), point0.position, point1.position)
+            else:
+                deltaLength = (point0.position - point1.position).length()
+                # Use the distance to scale the color of the constraint along the parabola.
+                # 2 * c.distance is max, 0 is also max, c.distance is min
+                colorScale = (((deltaLength - c.distance) * (1/c.distance))  ** 2)
+                if colorScale > 1: colorScale = 1 # Cap the value at 1
+                
+                # Draw a line from point0 to point1, colored according to how far away from neutral they are
+                pg.draw.aaline(window, (50, 50, int(255 * colorScale)), point0.position, point1.position)
 
-        # Create the four points based on the position +/- the offset
-        point0L: pg.Vector2 = point0.position + offset
-        point0R: pg.Vector2 = point0.position - offset
-        point1L: pg.Vector2 = point1.position - offset
-        point1R: pg.Vector2 = point1.position + offset
+        for c in b.outerConstraints: # Loop to draw the outer constraints as a filled
+            
+            # Get points so we can grab their position and also calculate the distance between them
+            point0: PointMass = e.points[c.index0]
+            point1: PointMass = e.points[c.index1]
 
-        # Draw the two lines
-        pg.draw.aaline(window, (0,0,0), point0L, point1R)
-        pg.draw.aaline(window, (0,0,0), point0R, point1L)
+            offset: pg.Vector2 = (point1.position - point0.position).rotate(90) # Grab the delta between them rotate that delta 90 degrees to get the offset vector
+            offset.scale_to_length(point0.radius * 0.7) # Scale the offset to nearly the radius length
+
+            # Create the four points based on the position +/- the offset
+            point0L: pg.Vector2 = point0.position + offset
+            point0R: pg.Vector2 = point0.position - offset
+            point1L: pg.Vector2 = point1.position - offset
+            point1R: pg.Vector2 = point1.position + offset
+
+            # Draw the two lines
+            pg.draw.aaline(window, (0,0,0), point0L, point1R)
+            pg.draw.polygon(window, b.color, [point0L, point0R, point1L, point1R])
 
     for p in e.points: # Loop to draw each point
         #print(str(p) + " @ " + str(p.position))
