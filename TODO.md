@@ -21,3 +21,7 @@
 - Add more SoftBody types
 
 - Implement config arguments
+
+## Known Issues:
+
+- Pausing the program disables the GUI panel
