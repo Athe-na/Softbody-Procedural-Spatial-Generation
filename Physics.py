@@ -4,6 +4,7 @@
 
 import math
 import pygame as pg
+import random
 
 class Resolution:
     def __init__(self, pos: pg.Vector2, vel: pg.Vector2, accel: pg.Vector2) -> None:
@@ -115,9 +116,48 @@ class SoftBody:
         self.outerConstraints: list[Constraint] = [] # The list of indexes which correspond to outer edges in self.constraints
         self.scale: float = 1
         self.IDCounter += 1
+        self.color: tuple[int, int, int] = (int(random.random()*255), int(random.random()*255), int(random.random()*255))
         #print("Initialized softbody " + str(self.id))
         #print("Constraints initialized in SoftBody: " + str(self.innerConstraints + self.outerConstraints))
+
+    def scaleShapeMult(self, delta: float):
+        '''
+        Multiplicatively scale the distance attribute in all constraints by the provided factor
+        '''
+        for c in self.outerConstraints + self.innerConstraints:
+            c.distance *= delta
+        return self
     
+    def scaleShapeAdd(self, delta: float): # Probably never going to use this lol but could be funny
+        '''
+        Additively scale the distance attribut4e in all constraints by the provided factor
+        '''
+        for c in self.outerConstraints + self.innerConstraints:
+            c.distance += delta
+        return self
+
+    def addPointAtPos(self, pos: pg.Vector2):
+        '''Helper method for creating a point at a specified position.
+        
+        Parameters
+        ----------
+        pos : pg.Vector2
+            Position of created point. (Noooooooooo...)
+
+        Returns
+        -------
+        int
+            id of created PointMass
+        '''
+        # Add the point to the point list, creating it at the specified spot
+        point = PointMass(pos, pg.Vector2(0,0), pg.Vector2(0,0))
+        self.points.append(point)
+        return point.id     
+
+
+    '''
+    SOFTBODY TYPES
+    '''    
     def dot(self, pos: pg.Vector2):
         '''
         Creates a body consisting of a singular PointMass at the specified position
@@ -177,40 +217,162 @@ class SoftBody:
 
         return self
     
+    def edgeSupportedRect(self, width: float, height: float, pos: pg.Vector2, lattice:int = 2, interiorSpringConst:int = 5):
+        '''
+        Creates a rectangular arrangement of interconnected PointMasses with a PointMass in the middle, and a supporting network of springs on the edges
 
-    def scaleShapeMult(self, delta: float):
-        '''
-        Multiplicatively scale the distance attribute in all constraints by the provided factor
-        '''
-        for c in self.outerConstraints + self.innerConstraints:
-            c.distance *= delta
-        return self
-    
-    def scaleShapeAdd(self, delta: float): # Probably never going to use this lol but could be funny
-        '''
-        Additively scale the distance attribut4e in all constraints by the provided factor
-        '''
-        for c in self.outerConstraints + self.innerConstraints:
-            c.distance += delta
-        return self
-
-    def addPointAtPos(self, pos: pg.Vector2):
-        '''Helper method for creating a point at a specified position.
-        
         Parameters
         ----------
         pos : pg.Vector2
-            Position of created point. (Noooooooooo...)
-
-        Returns
-        -------
-        int
-            id of created PointMass
+            The position of the central PointMass
+        lattice: int
+            The "degree of the internal support. 2 by default, linking the lattice point to the corner and center. 1 links only to the corner. 0 does not create a lattice point, and only links the edges to their adjacent edge.
         '''
-        # Add the point to the point list, creating it at the specified spot
-        point = PointMass(pos, pg.Vector2(0,0), pg.Vector2(0,0))
-        self.points.append(point)
-        return point.id     
+
+        # Initialize width and height vectors (facing down and right)
+        widthVec = pg.Vector2(1, 0) * width
+        heightVec = pg.Vector2(0, 1) * height
+
+        # Create points in all four corners
+        topRight = self.addPointAtPos(pos + widthVec/2 - heightVec/2)
+        topLeft = self.addPointAtPos(pos - widthVec/2 - heightVec/2)
+        botLeft = self.addPointAtPos(pos - widthVec/2 + heightVec/2)
+        botRight = self.addPointAtPos(pos + widthVec/2 + heightVec/2)
+
+        # Create points on all four edges
+        right = self.addPointAtPos(pos + widthVec/2)
+        bot = self.addPointAtPos(pos + heightVec/2)
+        left = self.addPointAtPos(pos - widthVec/2)
+        top = self.addPointAtPos(pos - heightVec/2)
+
+        # And in the center
+        center = self.addPointAtPos(pos)
+
+        if lattice > 0:
+            # If the lattice degree is greater than 0, create the lattice points
+            topRightLat = self.addPointAtPos(pos + widthVec/4 - heightVec/4)
+            topLeftLat = self.addPointAtPos(pos - widthVec/4 - heightVec/4)
+            botLeftLat = self.addPointAtPos(pos - widthVec/4 + heightVec/4)
+            botRightLat = self.addPointAtPos(pos + widthVec/4 + heightVec/4)
+            
+            self.innerConstraints.extend([
+                # Connect the lattice points to the outer corners
+                Constraint(topRightLat, topRight, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(botRightLat, botRight, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(botLeftLat, botLeft, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(topLeftLat, topLeft, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                # Connect the edges to the lattice points
+                Constraint(right, topRightLat, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(right, botRightLat, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(bot, botRightLat, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(bot, botLeftLat, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(left, botLeftLat, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(left, topLeftLat, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(top, topLeftLat, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(top, topRightLat, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+            ])
+        else:
+            # If the lattice degree is 0, connect edges to adjacent edges
+            self.innerConstraints.extend([
+                Constraint(right, bot, (heightVec/2+widthVec/2).length()),
+                Constraint(bot, left, (heightVec/2+widthVec/2).length()),
+                Constraint(left, top, (heightVec/2+widthVec/2).length()),
+                Constraint(top, right, (heightVec/2+widthVec/2).length())
+            ])
+            
+        if lattice > 1:
+            # If the lattice degree is greater than 1, connect the lattice points to the center
+            self.innerConstraints.extend([
+                Constraint(topRightLat, center, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(botRightLat, center, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(botLeftLat, center, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst),
+                Constraint(topLeftLat, center, (widthVec/4 + heightVec/4).length(), springConst=interiorSpringConst)
+            ])
+        
+
+        self.outerConstraints.extend([
+            # Link edges to corners
+            Constraint(right, topRight, (heightVec/2).length()),
+            Constraint(right, botRight, (heightVec/2).length()),
+            Constraint(bot, botRight, (widthVec/2).length()),
+            Constraint(bot, botLeft, (widthVec/2).length()),
+            Constraint(left, botLeft, (heightVec/2).length()),
+            Constraint(left, topLeft, (heightVec/2).length()),
+            Constraint(top, topLeft, (widthVec/2).length()),
+            Constraint(top, topRight, (widthVec/2).length()),
+                                      ])
+        
+        self.innerConstraints.extend([
+            # Link center to edges
+            Constraint(center, right, (widthVec/2).length(), springConst=interiorSpringConst),
+            Constraint(center, bot, (heightVec/2).length(), springConst=interiorSpringConst),
+            Constraint(center, left, (widthVec/2).length(), springConst=interiorSpringConst),
+            Constraint(center, top, (heightVec/2).length(), springConst=interiorSpringConst)
+            ])
+        
+        return self
+    
+    def ngon(self, radius: float, n: int, pos: pg.Vector2, stretch:float = 1, lattice:int = 0, centerPoint:bool = True, interiorSpringConst:int = 5):
+        '''
+        Creates an ngonic arrangement of interconnected PointMasses.
+
+        Parameters
+        ----------
+        pos : pg.Vector2
+            The position of the center of the SoftBody
+        n : int
+            The integer degree of the ngon [3, inf]
+        stretch : float (Default = 0)
+            How stretched the ngon should be along the x axis (0, inf)
+        lattice : int (Default = 0)
+            How many adjacent verticies each vertex should connect to
+        centerPoint : bool (Default = True)
+            Whether there should be a central PointMass connecting to each vertex.
+        '''
+
+        #Pointer used to direct each vertex from the center
+        pointer: pg.Vector2 = pg.Vector2(1, 0)
+        verticies: list[tuple[int, pg.Vector2]] = []
+
+        # Store a previous point for calculating desired spring distance
+        prev: pg.Vector2 = pg.Vector2(0,0)
+        for i in range(n):
+            # Set/Reset pointer length to the radius
+            pointer.scale_to_length(radius)
+            # Scale the x component of the pointer according to the provided stretch value
+            pointer.x *= stretch
+            # Create a new PointMass at the designated location and append the vertex's ID to the list
+            verticies.append((self.addPointAtPos(pos + pointer), pos + pointer))
+            # Rotate the pointer in place
+            pointer.rotate_ip(360/n)
+
+            if i > 0: # If it's not the first created point, create a constraint from this point to the previous one
+                self.outerConstraints.append(Constraint(verticies[i][0], verticies[i-1][0], ((pos + pointer) - prev).length()))
+
+            # Update the prev variable
+            prev = pos + pointer
+        
+        # Link the last point to the first one
+        self.outerConstraints.append(Constraint(verticies[n-1][0], verticies[0][0], (verticies[n-1][1] - verticies[0][1]).length()))
+
+        if centerPoint:
+            center = self.addPointAtPos(pos)
+
+        for i in range(n):
+            for l in range(lattice): # Link points together internally according to the lattice degree
+                self.innerConstraints.append(Constraint(verticies[i][0], verticies[(i+l+2) % n][0], (verticies[i][1] - verticies[(i+l+2) % n][1]).length()))
+            # Link to the center point if there is one
+            if centerPoint:
+                self.innerConstraints.append(Constraint(verticies[i][0], center, (verticies[i][1] - pos).length()))
+
+        return self
+    
+    '''
+    More shapes TODO:
+    
+    Dinosaur
+    
+    '''
 
 class Engine:
     
