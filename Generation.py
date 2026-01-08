@@ -122,21 +122,55 @@ class Room:
     def __str__(self):
         return str(self.roomType).split(".")[1]
 
+class Rule:
+    def __init__(self, roomClass: RoomClass, graphs: list[nx.Graph], chances: list[float]) -> None:
+        self.roomClass = roomClass
+        self.graphs = graphs
+        self.chances = chances
+
+        # Ensure that the chances sum to 1
+        if sum(chances) != 1:
+            raise ValueError("Rule chance sum is not equal to 1")
+        
+        # Initialize accumulator variables
+        accum: float = 0
+        prev: float = 0
+        # Change chances list to be ascending structure for roll method
+        for chance in chances:
+            accum += prev
+            prev = chance
+            chance = accum
+
+    def roll(self, val: float):
+        '''
+        Function that returns a graph based on the provided roll value [0, 1]
+        '''
+        for i in range(len(self.graphs)):
+            if val >= self.chances[i]:
+                return self.graphs[i]
+
+
 class Ruleset:
+    '''
+    A ruleset is a tuple of Rules.
+    '''
 
     def __init__(self) -> None:
         self.ruleset = None
 
     def suburban(self):
         
+        # Initialize a few public room objects to be used in graphs
         pub0 = Room(RoomClass.PUBLIC)
         pub1 = Room(RoomClass.PUBLIC)
         pub2 = Room(RoomClass.PUBLIC)
 
+        # Construct a simple line of public rooms
         simpleLine: nx.Graph = nx.Graph()
         simpleLine.add_nodes_from([pub0, pub1])
         simpleLine.add_edge(pub0, pub1)
 
+        # Construct a connected branch of public rooms
         branch: nx.Graph = nx.Graph()
         branch.add_nodes_from([pub0, pub1, pub2])
         branch.add_edges_from([(pub0, pub1), (pub0, pub2), (pub1, pub2)])
@@ -164,14 +198,13 @@ class Ruleset:
 
 class Generation:
 
-    def __init__(self, Adj: nx.Graph, capacity: int, anchor: str):
+    def __init__(self, ruleset: Ruleset, capacity: int, anchor: Room):
 
         # Initialize an nx graph to put our room nodes into. This is the room structure we are generating
         G = nx.Graph()
         G.add_node(anchor)
 
 def main():
-    Adj = nx.Graph()
 
     pub0 = Room(RoomClass.PUBLIC)
     pub1 = Room(RoomClass.PUBLIC)
@@ -196,6 +229,9 @@ def main():
 # Alternatively, place hallways where rooms touch that aren't meant to be adjacent? (sometimes) (PENISES)
 # When we place down room x from room y, see if room z connected to y is in x's acceptable adjacent rooms, if so, connect them.
 # Pre place bathrooms in generation graph, initialize connections from rooms being built in breadth first when rolled?
+# Also, paper indicates that hallways typically connect social rooms to a cluster of branching off private rooms.
+# When a public room rolls a cluster of private rooms, roll another value for how many of those private rooms will
+# connect to the public room via a hallway.
 
 if __name__ == "__main__":
     main()
