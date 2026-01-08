@@ -1,6 +1,8 @@
 import networkx as nx
 import random
 from enum import Enum
+import matplotlib.pyplot as plt
+
 
 # Authored by Athena Osborne with help from Jamie Osborne, derived from the "complex method" described in Jess Martin's "Algorithmic Beauty of Buildings".
 
@@ -117,6 +119,9 @@ class Room:
     def addType(self, roomType: RoomType):
         self.roomType = roomType
 
+    def __str__(self):
+        return str(self.roomType).split(".")[1]
+
 class Ruleset:
 
     def __init__(self) -> None:
@@ -154,7 +159,7 @@ class Ruleset:
         toBed: nx.Graph = nx.Graph()
         toBed.add_node(bed0)
 
-        
+
         
 
 class Generation:
@@ -168,9 +173,29 @@ class Generation:
 def main():
     Adj = nx.Graph()
 
+    pub0 = Room(RoomClass.PUBLIC)
+    pub1 = Room(RoomClass.PUBLIC)
+    pub2 = Room(RoomClass.PUBLIC)
+
+    simpleLine: nx.Graph = nx.Graph()
+    simpleLine.add_nodes_from([pub0, pub1])
+    simpleLine.add_edge(pub0, pub1)
+
+    branch: nx.Graph = nx.Graph()
+    branch.add_nodes_from([pub0, pub1, pub2])
+    branch.add_edges_from([(pub0, pub1), (pub0, pub2), (pub1, pub2)])
+
+    G = branch
+    subax1 = plt.subplot(121)
+    nx.draw(G, with_labels=True, font_weight='bold', font_size=5)
+    plt.show()
+
 
 # Some thoughts about how hallways can be negotiated within this framework:
 # High level idea, places where edges cross are where hallways are placed, no edge cross indicates direct connection
 # Alternatively, place hallways where rooms touch that aren't meant to be adjacent? (sometimes) (PENISES)
 # When we place down room x from room y, see if room z connected to y is in x's acceptable adjacent rooms, if so, connect them.
 # Pre place bathrooms in generation graph, initialize connections from rooms being built in breadth first when rolled?
+
+if __name__ == "__main__":
+    main()
