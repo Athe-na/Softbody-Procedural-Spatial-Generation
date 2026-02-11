@@ -83,10 +83,10 @@ def runSim(WIDTH, HEIGHT) -> bool:
     # Create a list of SoftBodies
     softBodies: list[SoftBody] = [
                                   SoftBody().dottedRect(100, 100, pg.Vector2(100,100)),
-                                  SoftBody().ngon(50, 10, pg.Vector2(1200, 200), centerPoint=False, lattice=2, interiorSpringConst=5),
-                                  SoftBody().edgeSupportedRect(100, 100, pg.Vector2(400, 600), 2, 10),
-                                  SoftBody().edgeSupportedRect(150, 100, pg.Vector2(200, 700), 2, 10),
-                                  SoftBody().edgeSupportedRect(100, 100, pg.Vector2(400, 150), 2)
+                                  SoftBody().ngon(50, 12, pg.Vector2(1200, 200), centerPoint=False, lattice=2, interiorSpringConst=20),
+                                  SoftBody().edgeSupportedRect(100, 100, pg.Vector2(400, 600), 2, 20),
+                                  SoftBody().edgeSupportedRect(150, 100, pg.Vector2(200, 700), 2, 20),
+                                  SoftBody().edgeSupportedRect(100, 100, pg.Vector2(400, 150), 2, 20)
                                   ]
 
     # Provide initial walls (NOT CURRENTLY IN USE)
@@ -94,7 +94,7 @@ def runSim(WIDTH, HEIGHT) -> bool:
 
     
     # Initialize the engine
-    e = Engine(softBodies, walls, 0.75, 0.5, 2, WIDTH-400, HEIGHT)
+    e = Engine(softBodies, walls, 0.75, 0.25, 2, WIDTH-400, HEIGHT)
     drawEngine(e, simWindow)
     pg.display.update()
 

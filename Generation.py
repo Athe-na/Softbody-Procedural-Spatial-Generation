@@ -1,3 +1,4 @@
+import sys
 import networkx as nx
 import random
 from enum import Enum
@@ -118,6 +119,7 @@ class Room:
 
     def addType(self, roomType: RoomType):
         self.roomType = roomType
+        return self
 
     def __str__(self):
         return str(self.roomType).split(".")[1]
@@ -125,7 +127,7 @@ class Room:
 class Rule:
     def __init__(self, roomClass: RoomClass, graphs: list[nx.Graph], chances: list[float]) -> None:
         self.roomClass = roomClass
-        self.graphs = graphs
+        self.graphs: list[nx.Graph] = graphs
         self.chances = chances
 
         # Ensure that the chances sum to 1
@@ -141,13 +143,16 @@ class Rule:
             prev = chance
             chance = accum
 
-    def roll(self, val: float):
+    def roll(self, val: float) -> nx.Graph:
         '''
         Function that returns a graph based on the provided roll value [0, 1]
         '''
         for i in range(len(self.graphs)):
             if val >= self.chances[i]:
                 return self.graphs[i]
+        
+        # We shouldn't ever get to this point of execution, but putting this here to make python happy.
+        return self.graphs[0]
 
 
 class Ruleset:
@@ -156,7 +161,7 @@ class Ruleset:
     '''
 
     def __init__(self) -> None:
-        self.ruleset = None
+        self.rules: list[Rule] = [Rule(RoomClass.PUBLIC, [nx.Graph()], [1.0])]
 
     def suburban(self):
         
@@ -175,9 +180,7 @@ class Ruleset:
         branch.add_nodes_from([pub0, pub1, pub2])
         branch.add_edges_from([(pub0, pub1), (pub0, pub2), (pub1, pub2)])
 
-        self.ruleset = {
-            RoomClass.PUBLIC : [[simpleLine, 0.6], [branch, 0.4]]
-        }
+        self.rules = [Rule(RoomClass.PUBLIC, [simpleLine, branch], [0.6, 0.4])]
 
         priv = Room(RoomClass.PRIVATE)
         bath = Room(RoomClass.PRIVATE).addType(RoomType.BATHROOM)
@@ -193,6 +196,14 @@ class Ruleset:
         toBed: nx.Graph = nx.Graph()
         toBed.add_node(bed0)
 
+        toBedBathDiamond: nx.Graph = nx.Graph()
+        toBedBathDiamond.add_nodes_from([priv, bed0, bed1, bath])
+        toBedBathDiamond.add_edges_from([(priv, bed0), (priv, bed1), (bed0, bath), (bed1, bath)])
+
+        toBedBathDiamondWithDirectAccess: nx.Graph = nx.Graph()
+
+        return self
+
 
         
 
@@ -202,9 +213,11 @@ class Generation:
 
         # Initialize an nx graph to put our room nodes into. This is the room structure we are generating
         G = nx.Graph()
-        G.add_node(anchor)
+        
 
 def main():
+
+    random.seed(sys.argv[1])
 
     pub0 = Room(RoomClass.PUBLIC)
     pub1 = Room(RoomClass.PUBLIC)
@@ -218,7 +231,14 @@ def main():
     branch.add_nodes_from([pub0, pub1, pub2])
     branch.add_edges_from([(pub0, pub1), (pub0, pub2), (pub1, pub2)])
 
-    G = branch
+    ruleset = Ruleset().suburban()
+
+    ruleRoll = random.random()
+    print(ruleRoll)
+
+    G = ruleset.rules[0].roll(ruleRoll)
+
+    # Draw the graph
     subax1 = plt.subplot(121)
     nx.draw(G, with_labels=True, font_weight='bold', font_size=5)
     plt.show()
