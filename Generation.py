@@ -125,43 +125,32 @@ class Room:
         return str(self.roomType).split(".")[1]
 
 class Rule:
-    def __init__(self, roomClass: RoomClass, graphs: list[nx.Graph], chances: list[float]) -> None:
-        self.roomClass = roomClass
-        self.graphs: list[nx.Graph] = graphs
-        self.chances = chances
-
-        # Ensure that the chances sum to 1
-        if sum(chances) != 1:
-            raise ValueError("Rule chance sum is not equal to 1")
-        
-        # Initialize accumulator variables
-        accum: float = 0
-        prev: float = 0
-        # Change chances list to be ascending structure for roll method
-        for chance in chances:
-            accum += prev
-            prev = chance
-            chance = accum
-
-    def roll(self, val: float) -> nx.Graph:
-        '''
-        Function that returns a graph based on the provided roll value [0, 1]
-        '''
-        for i in range(len(self.graphs)):
-            if val >= self.chances[i]:
-                return self.graphs[i]
-        
-        # We shouldn't ever get to this point of execution, but putting this here to make python happy.
-        return self.graphs[0]
-
+    def __init__(self, graph: nx.Graph, weight: float) -> None:
+        self.graph: nx.Graph = graph
+        self.weight = weight
 
 class Ruleset:
     '''
-    A ruleset is a tuple of Rules.
+    A ruleset is a container of Rules.
     '''
 
     def __init__(self) -> None:
-        self.rules: list[Rule] = [Rule(RoomClass.PUBLIC, [nx.Graph()], [1.0])]
+        self.publicRules: list[Rule] = [Rule(nx.Graph(), 1.0)]
+        self.privateRules: list[Rule] = [Rule(nx.Graph(), 1.0)]
+
+    def rollPublic(self) -> nx.Graph:
+        '''
+        Function that returns a graph based on the provided roll value [0, 1]
+        '''
+        weights = [rule.weight for rule in self.publicRules]
+        return random.choices(self.publicRules, weights=weights, k=1)[0].graph 
+
+    def rollPrivate(self) -> nx.Graph:
+        '''
+        Function that returns a graph based on the provided roll value [0, 1]
+        '''
+        weights = [rule.weight for rule in self.privateRules]
+        return random.choices(self.privateRules, weights=weights, k=1)[0].graph 
 
     def suburban(self):
         
@@ -180,8 +169,12 @@ class Ruleset:
         branch.add_nodes_from([pub0, pub1, pub2])
         branch.add_edges_from([(pub0, pub1), (pub0, pub2), (pub1, pub2)])
 
-        self.rules = [Rule(RoomClass.PUBLIC, [simpleLine, branch], [0.6, 0.4])]
+        self.publicRules = [
+            Rule(simpleLine, 0.6),
+            Rule(branch, 0.4)
+            ]
 
+        # Make a few instances to make graphs from
         priv = Room(RoomClass.PRIVATE)
         bath = Room(RoomClass.PRIVATE).addType(RoomType.BATHROOM)
         bed0 = Room(RoomClass.PRIVATE).addType(RoomType.BEDROOM)
@@ -201,6 +194,34 @@ class Ruleset:
         toBedBathDiamond.add_edges_from([(priv, bed0), (priv, bed1), (bed0, bath), (bed1, bath)])
 
         toBedBathDiamondWithDirectAccess: nx.Graph = nx.Graph()
+        toBedBathDiamondWithDirectAccess.add_nodes_from([priv, bed0, bed1, bath])
+        toBedBathDiamondWithDirectAccess.add_edges_from([(priv, bed0), (priv, bed1), (priv, bath), (bed0, bath), (bed1, bath)])
+
+        toMasterBedBath: nx.Graph = nx.Graph()
+        toMasterBedBath.add_nodes_from([masterbed, masterbath])
+        toMasterBedBath.add_edge(masterbed, masterbath)
+
+        toLaundry: nx.Graph = nx.Graph()
+        toLaundry.add_node(laundryroom)
+
+        toBedBath: nx.Graph = nx.Graph()
+        toBedBath.add_nodes_from([bed0, bath])
+        toBedBath.add_edge(bed0, bath)
+
+        toBedBathBranching: nx.Graph = nx.Graph()
+        toBedBathBranching.add_nodes_from([priv, bed0, bed1, bath])
+        toBedBathBranching.add_edges_from([(priv, bed0), (priv, bed1), (priv, bath)])
+
+        self.privateRules = [
+            Rule(toBath, 1),
+            Rule(toBed, 1),
+            Rule(toBedBathDiamond, 1),
+            Rule(toBedBathDiamondWithDirectAccess, 1),
+            Rule(toMasterBedBath, 1),
+            Rule(toLaundry, 1),
+            Rule(toBedBath, 1),
+            Rule(toBedBathBranching, 1)
+        ]
 
         return self
 
@@ -213,6 +234,17 @@ class Generation:
 
         # Initialize an nx graph to put our room nodes into. This is the room structure we are generating
         G = nx.Graph()
+        G.add_node(RoomClass.PUBLIC)
+        
+        # Initialize the ruleset
+        ruleset = Ruleset().suburban()
+
+
+    '''
+    Generate a full graph by iterating over each untyped node and replacing it according to the ruleset.
+    '''
+    def generate(self):
+        pass
         
 
 def main():
@@ -233,10 +265,7 @@ def main():
 
     ruleset = Ruleset().suburban()
 
-    ruleRoll = random.random()
-    print(ruleRoll)
-
-    G = ruleset.rules[0].roll(ruleRoll)
+    G = ruleset.rollPrivate()
 
     # Draw the graph
     subax1 = plt.subplot(121)
